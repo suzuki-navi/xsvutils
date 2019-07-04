@@ -57,7 +57,7 @@ object Parser {
 
   def parseCommandSeq(arg: List[String]): OptResult[CommandSeq] = {
     val (input, rest) = parseInput(arg)
-    val (cmds, rest2) = parseMany(parseCommand, arg)
+    val (cmds, rest2) = parseMany(parseCommand, rest)
     (Some(CommandSeq(input, cmds)), rest2)
   }
 
