@@ -1,1 +1,2 @@
-$MULANG_SOURCE_DIR/main-scala
+#!/bin/sh
+$MULANG_SOURCE_DIR/main-scala "$@"
