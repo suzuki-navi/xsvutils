@@ -101,7 +101,8 @@ object Parser {
   }
 
   def exists(file: String): Boolean = {
-    // TODO
-    true
+    import java.nio.file.{Paths, Files}
+
+    Files.exists(Paths.get(file))
   }
 }
