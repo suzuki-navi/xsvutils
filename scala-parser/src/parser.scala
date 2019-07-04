@@ -123,7 +123,6 @@ object Parser {
 
   def parseJoinOption(arg: List[String]): OptResult[Command.Join.Option] = {
     arg match {
-      case "--file" :: file :: tail if exists(file) => (Some(Command.Join.Option.File(file)), tail)
       case file :: tail if exists(file) => (Some(Command.Join.Option.File(file)), tail)
       case "--file" :: "[" :: tail => {
         parseCommandSeq(tail) match {
@@ -131,6 +130,7 @@ object Parser {
           case _ => (None, arg)
         }
       }
+      case "--file" :: file :: tail => (Some(Command.Join.Option.File(file)), tail)
       case "[" :: tail => {
         parseCommandSeq(tail) match {
           case (Some(seq), "]" :: tail2) => (Some(Command.Join.Option.SubSeq(seq)), tail2)
@@ -177,7 +177,7 @@ object Parser {
 
   def colname(name: String): Boolean = {
     name match {
-      case "cut" | "join" | "insconst" => false
+      case "]" | "cut" | "join" | "insconst" => false
       case _ => true
     }
   }
