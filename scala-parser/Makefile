@@ -8,3 +8,5 @@ var/mulang/mulang:
 	cd var/mulang; git clone 'https://github.com/xsvutils/xsv-mulang.git' ./
 	cd var/mulang; make
 
+var/class_file/Main.class: src/*.scala
+	scalac -deprecation -d var/class_file $<
