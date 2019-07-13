@@ -1,19 +1,14 @@
 // mulang-bin-sources: scala
 
-object Main {
-  def main(args: Array[String]): Unit = {
-    OptionParser.parse(args.toList, 0) match {
-      case Right(status) =>
-        println(status);
-        //printDocuments(documents);
-      case Left(OptionParser.ParserErrorMessage(argIdx, message)) =>
-        println("error: (%d) \"%s\": %s".format(argIdx, args(argIdx), message));
-        //printDocuments(documents);
-    }
-  }
-}
-
 object OptionParser {
+
+  object ForCommand {
+    type CommandSeqParserStatus = OptionParser.CommandSeqParserStatus;
+    type CommandParserStatus = OptionParser.CommandParserStatus;
+    type CommandOptions = OptionParser.CommandOptions;
+    type ParserErrorMessage = OptionParser.ParserErrorMessage;
+    val ParserErrorMessage = OptionParser.ParserErrorMessage;
+  }
 
   def parse(args: List[String], argIdx: Int): Either[ParserErrorMessage, CommandSeqOptions] = {
     val initArgs = args;
@@ -105,7 +100,7 @@ object OptionParser {
     }
     def command(name: String, lastCommand: CommandOptions, argIdx: Int): Option[CommandParserStatus] = {
       name match {
-        case "cut" => Some(CutCommandParserStatus(lastCommand, argIdx, None));
+        case "cut" => Some(CutCommand.CutCommandParserStatus(lastCommand, argIdx, None));
         case _ => None;
       }
     }
@@ -168,40 +163,5 @@ object OptionParser {
   }
 
   case object NoCommandOptions extends CommandOptions;
-
-  case class CutCommandParserStatus (
-    prevCommand: CommandOptions,
-    argIdx: Int,
-    cols: Option[List[String]],
-  ) extends CommandParserStatus {
-
-    def parseOption(status: CommandSeqParserStatus, opt: String, tail: List[String], argIdx: Int): Either[ParserErrorMessage, (CommandSeqParserStatus, List[String], Int)] = {
-      Left(ParserErrorMessage(argIdx, "unknown option"));
-    }
-
-    def parseArgument(status: CommandSeqParserStatus, arg: String, tail: List[String], argIdx: Int): Either[ParserErrorMessage, (CommandSeqParserStatus, List[String], Int)] = {
-      if (cols.isEmpty) {
-        Right((status.copy(lastCommand = this.copy(cols = Some(arg.split(",").toList))), tail, argIdx + 1));
-      } else {
-        Left(ParserErrorMessage(argIdx, "unknown argument"));
-      }
-    }
-
-    def finish: Either[ParserErrorMessage, CommandOptions] = {
-      cols match {
-        case None =>
-          Left(ParserErrorMessage(argIdx, "expected --cols option"));
-        case Some(cols) =>
-          Right(CutCommandOptions(prevCommand, cols));
-      }
-    }
-
-  }
-
-  case class CutCommandOptions (
-    prevCommand: CommandOptions,
-    cols: List[String],
-  ) extends CommandOptions {
-  }
 
 }
