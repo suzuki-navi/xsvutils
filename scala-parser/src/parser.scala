@@ -2,183 +2,206 @@
 
 object Main {
   def main(args: Array[String]): Unit = {
-    val total = Parser.parseTotalCmdSeq(args.toList)
-    println(total)
-  }
-}
-
-case class TotalCmdSeq(globalOptions: List[GlobalOption], commandSeq: CommandSeq)
-
-sealed trait GlobalOption {}
-object GlobalOption {
-  case class Tsv() extends GlobalOption
-  case class Csv() extends GlobalOption
-  case class Input(file: String) extends GlobalOption
-  case class Output(file: String) extends GlobalOption
-}
-
-case class CommandSeq(input: Option[String], commands: List[Command])
-
-sealed trait Command {}
-object Command {
-  case class Cut(option: List[Cut.Option]) extends Command
-  case class Join(option: List[Join.Option]) extends Command
-  case class InsConst(option: List[InsConst.Option]) extends Command
-
-  object Cut {
-    sealed trait Option {}
-    object Option {
-      case class Cols(cols: String) extends Option
-      case class Help() extends Option
-      case class G(g: GlobalOption) extends Option
-    }
-  }
-  object Join {
-    sealed trait Option {}
-    object Option {
-      case class File(file: String) extends Option
-      case class SubSeq(subSeq: CommandSeq) extends Option
-      case class InnerJoin() extends Option
-      case class LeftOuterJoin() extends Option
-      case class RightOuterJoin() extends Option
-      case class FullOuterJoin() extends Option
-      case class Help() extends Option
-      case class G(g: GlobalOption) extends Option
-    }
-  }
-  object InsConst {
-    sealed trait Option {}
-    object Option {
-      case class Value(value: String) extends Option
-      case class Dst(dst: String) extends Option
-      case class ValueDst(value: String, dst: String) extends Option
-      case class Help() extends Option
-      case class G(g: GlobalOption) extends Option
+    OptionParser.parse(args.toList, 0) match {
+      case Right(status) =>
+        println(status);
+        //printDocuments(documents);
+      case Left(OptionParser.ParserErrorMessage(argIdx, message)) =>
+        println("error: (%d) \"%s\": %s".format(argIdx, args(argIdx), message));
+        //printDocuments(documents);
     }
   }
 }
 
-object Parser {
-  type OptResult[T] = (Option[T], List[String])
-  type ListResult[T] = (List[T], List[String])
+object OptionParser {
 
-  implicit class ResultExt[T](val value: (T, List[String])) extends AnyVal {
-    def map[U](f: T => U): (U, List[String]) = {
-      val (x, y) = value
-      (f(x), y)
+  def parse(args: List[String], argIdx: Int): Either[ParserErrorMessage, CommandSeqOptions] = {
+    val initArgs = args;
+    @scala.annotation.tailrec
+    def sub(status: CommandSeqParserStatus, args: List[String], argIdx: Int): Either[ParserErrorMessage, CommandSeqOptions] = {
+      args match {
+        case Nil =>
+          status.finish;
+        case arg :: tail =>
+          status.parse(arg, tail, argIdx) match {
+            case Left(e) =>
+              Left(e);
+            case Right((s, tail, idx)) =>
+              sub(s, tail, idx);
+          }
+      }
     }
+    sub(CommandSeqParserStatus.init, args, argIdx);
   }
 
-  def parseTotalCmdSeq(arg: List[String]): OptResult[TotalCmdSeq] = {
-    val (options, rest) = parseMany(parseGlobalOption, arg)
-    parseCommandSeq(rest) match {
-      case (None, tail) => (None, arg)
-      case (Some(cmdSeq), tail) => (Some(TotalCmdSeq(options, cmdSeq)), tail)
+  object CommandSeqParserStatus {
+    def init = CommandSeqParserStatus(None, None, NoCommandParserStatus);
+  }
+
+  case class CommandSeqParserStatus (
+    inputFormat: Option[InputFormat],
+    inputFile: Option[String],
+    lastCommand: CommandParserStatus,
+  ) {
+
+    def parse(arg: String, tail: List[String], argIdx: Int): Either[ParserErrorMessage, (CommandSeqParserStatus, List[String], Int)] = {
+      parseCommandSeqParserStatus(this, arg, tail, argIdx);
     }
-  }
 
-  def parseGlobalOption(arg: List[String]): OptResult[GlobalOption] = {
-    arg match {
-      case "--tsv" :: tail => (Some(GlobalOption.Tsv()), tail)
-      case "--csv" :: tail => (Some(GlobalOption.Csv()), tail)
-      case "-i" :: file :: tail if (exists(file)) => (Some(GlobalOption.Input(file)), tail)
-      case "-o" :: file :: tail => (Some(GlobalOption.Output(file)), tail)
-      case _ => (None, arg)
+    def finish: Either[ParserErrorMessage, CommandSeqOptions] = {
+      lastCommand.finish match {
+        case Left(err) =>
+          Left(err);
+        case Right(cmd) =>
+          Right(CommandSeqOptions(inputFormat, inputFile, cmd));
+      }
     }
+
   }
 
-  def parseCommandSeq(arg: List[String]): OptResult[CommandSeq] = {
-    val (input, rest) = parseInput(arg)
-    val (cmds, rest2) = parseMany(parseCommand, rest)
-    (Some(CommandSeq(input, cmds)), rest2)
+  case class CommandSeqOptions (
+    inputFormat: Option[InputFormat],
+    inputFile: Option[String],
+    lastCommand: CommandOptions,
+  ) {
   }
 
-  def parseInput(arg: List[String]): OptResult[String] = {
-    arg match {
-      case file :: tail if exists(file) => (Some(file), tail)
-      case _ => (None, arg)
+  sealed trait InputFormat;
+  case object TsvInputFormat extends InputFormat;
+  case object CsvInputFormat extends InputFormat;
+
+  case class ParserErrorMessage(argIdx: Int, message: String);
+
+  def inputFileExists(file: String): Boolean = {
+    true; // TODO
+  }
+
+  def isOption(arg: String): Boolean = {
+    arg.startsWith("-");
+  }
+
+//  trait ArgDocument;
+//
+//  case object GlobalOptionsDocument extends ArgDocument;
+
+  trait CommandParserStatus {
+
+    def parseOption(status: CommandSeqParserStatus, opt: String, tail: List[String], argIdx: Int): Either[ParserErrorMessage, (CommandSeqParserStatus, List[String], Int)];
+
+    def parseArgument(status: CommandSeqParserStatus, arg: String, tail: List[String], argIdx: Int): Either[ParserErrorMessage, (CommandSeqParserStatus, List[String], Int)];
+
+    def finish: Either[ParserErrorMessage, CommandOptions];
+
+  }
+  trait CommandOptions {
+  }
+
+  object CommandParserStatus {
+    def exists(name: String): Boolean = {
+      name match {
+        case "cut" => true;
+        case _ => false;
+      }
     }
-  }
-
-  def parseCommand(arg: List[String]): OptResult[Command] = {
-    arg match {
-      case "cut" :: rest => parseMany(parseCutOption, rest).map(opts => Some(Command.Cut(opts)))
-      case "join" :: rest => parseMany(parseJoinOption, rest).map(opts => Some(Command.Join(opts)))
-      case "insconst" :: rest => parseMany(parseJoinOption, rest).map(opts => Some(Command.Join(opts)))
-      case _ => (None, arg)
-    }
-  }
-
-  def parseCutOption(arg: List[String]): OptResult[Command.Cut.Option] = {
-    arg match {
-      case "--col" :: cols :: tail => (Some(Command.Cut.Option.Cols(cols)), tail)
-      case "--help" :: tail => (Some(Command.Cut.Option.Help()), tail)
-      case _ => parseGlobalOption(arg) match {
-        case (Some(g), tail) => (Some(Command.Cut.Option.G(g)), tail)
-        case (None, cols :: tail) if colname(cols) => (Some(Command.Cut.Option.Cols(cols)), tail)
-        case _ => (None, arg)
+    def command(name: String, lastCommand: CommandOptions, argIdx: Int): Option[CommandParserStatus] = {
+      name match {
+        case "cut" => Some(CutCommandParserStatus(lastCommand, argIdx, None));
+        case _ => None;
       }
     }
   }
 
-  def parseJoinOption(arg: List[String]): OptResult[Command.Join.Option] = {
-    arg match {
-      case file :: tail if exists(file) => (Some(Command.Join.Option.File(file)), tail)
-      case "--file" :: "[" :: tail => {
-        parseCommandSeq(tail) match {
-          case (Some(seq), "]" :: tail2) => (Some(Command.Join.Option.SubSeq(seq)), tail2)
-          case _ => (None, arg)
+  private def parseCommandSeqParserStatus(status: CommandSeqParserStatus, arg: String, tail: List[String], argIdx: Int): Either[ParserErrorMessage, (CommandSeqParserStatus, List[String], Int)] = {
+    if (isOption(arg)) {
+      if (arg == "--tsv") {
+        status.inputFormat match {
+          case Some(_) => Left(ParserErrorMessage(argIdx, "duplicated option"));
+          case None => Right((status.copy(inputFormat = Some(TsvInputFormat)), tail, argIdx + 1));
         }
-      }
-      case "--file" :: file :: tail => (Some(Command.Join.Option.File(file)), tail)
-      case "[" :: tail => {
-        parseCommandSeq(tail) match {
-          case (Some(seq), "]" :: tail2) => (Some(Command.Join.Option.SubSeq(seq)), tail2)
-          case _ => (None, arg)
+      } else if (arg == "--csv") {
+        status.inputFormat match {
+          case Some(_) => Left(ParserErrorMessage(argIdx, "duplicated option"));
+          case None => Right((status.copy(inputFormat = Some(CsvInputFormat)), tail, argIdx + 1));
         }
+      } else if (arg == "-i") {
+        status.inputFile match {
+          case Some(_) => Left(ParserErrorMessage(argIdx, "duplicated option"));
+          case None =>
+            tail match {
+              case file :: tail2 =>
+                if (inputFileExists(file)) {
+                  Right((status.copy(inputFile = Some(file)), tail2, argIdx + 2));
+                } else {
+                  Left(ParserErrorMessage(argIdx + 1, "file not found"));
+                }
+              case Nil =>
+                Left(ParserErrorMessage(argIdx, "file path expected"));
+            }
+        }
+      } else {
+        status.lastCommand.parseOption(status, arg, tail, argIdx);
       }
-      case "--inner" :: tail => (Some(Command.Join.Option.InnerJoin()), tail)
-      case "--left-outer" :: tail => (Some(Command.Join.Option.LeftOuterJoin()), tail)
-      case "--right-outer" :: tail => (Some(Command.Join.Option.RightOuterJoin()), tail)
-      case "--full-outer" :: tail => (Some(Command.Join.Option.FullOuterJoin()), tail)
-      case "--help" :: tail => (Some(Command.Join.Option.Help()), tail)
-      case _ => parseGlobalOption(arg) match {
-        case (Some(g), tail) => (Some(Command.Join.Option.G(g)), tail)
-        case _ => (None, arg)
+    } else if (CommandParserStatus.exists(arg)) {
+      status.lastCommand.finish match {
+        case Left(err) =>
+          Left(err);
+        case Right(cmd) =>
+          Right((status.copy(lastCommand = CommandParserStatus.command(arg, cmd, argIdx).get), tail, argIdx + 1));
+      }
+    } else {
+      status.lastCommand.parseArgument(status, arg, tail, argIdx);
+    }
+  }
+
+  case object NoCommandParserStatus extends CommandParserStatus {
+
+    def parseOption(status: CommandSeqParserStatus, opt: String, tail: List[String], argIdx: Int): Either[ParserErrorMessage, (CommandSeqParserStatus, List[String], Int)] = {
+      Left(ParserErrorMessage(argIdx, "unknown option"));
+    }
+
+    def parseArgument(status: CommandSeqParserStatus, arg: String, tail: List[String], argIdx: Int): Either[ParserErrorMessage, (CommandSeqParserStatus, List[String], Int)] = {
+      Left(ParserErrorMessage(argIdx, "unknown argument"));
+    }
+
+    def finish: Either[ParserErrorMessage, CommandOptions] = Right(NoCommandOptions);
+
+  }
+
+  case object NoCommandOptions extends CommandOptions;
+
+  case class CutCommandParserStatus (
+    prevCommand: CommandOptions,
+    argIdx: Int,
+    cols: Option[List[String]],
+  ) extends CommandParserStatus {
+
+    def parseOption(status: CommandSeqParserStatus, opt: String, tail: List[String], argIdx: Int): Either[ParserErrorMessage, (CommandSeqParserStatus, List[String], Int)] = {
+      Left(ParserErrorMessage(argIdx, "unknown option"));
+    }
+
+    def parseArgument(status: CommandSeqParserStatus, arg: String, tail: List[String], argIdx: Int): Either[ParserErrorMessage, (CommandSeqParserStatus, List[String], Int)] = {
+      if (cols.isEmpty) {
+        Right((status.copy(lastCommand = this.copy(cols = Some(arg.split(",").toList))), tail, argIdx + 1));
+      } else {
+        Left(ParserErrorMessage(argIdx, "unknown argument"));
       }
     }
-  }
 
-  def parseInsConstOption(arg: List[String]): OptResult[Command.InsConst.Option] = {
-    arg match {
-      case "--value" :: value :: tail => (Some(Command.InsConst.Option.Value(value)), tail)
-      case "--dst" :: value :: tail => (Some(Command.InsConst.Option.Dst(value)), tail)
-      case "--help" :: tail => (Some(Command.InsConst.Option.Help()), tail)
-      case _ => parseGlobalOption(arg) match {
-        case (Some(g), tail) => (Some(Command.InsConst.Option.G(g)), tail)
-        case (None, value :: dst :: tail) => (Some(Command.InsConst.Option.ValueDst(value, dst)), tail)
-        case _ => (None, arg)
+    def finish: Either[ParserErrorMessage, CommandOptions] = {
+      cols match {
+        case None =>
+          Left(ParserErrorMessage(argIdx, "expected --cols option"));
+        case Some(cols) =>
+          Right(CutCommandOptions(prevCommand, cols));
       }
     }
+
   }
 
-  def parseMany[T](f: List[String] => OptResult[T], arg: List[String]): ListResult[T] = {
-    f(arg) match {
-      case (None, tail) => (Nil, tail)
-      case (Some(t), tail) => parseMany(f, tail).map(x => t::x)
-    }
+  case class CutCommandOptions (
+    prevCommand: CommandOptions,
+    cols: List[String],
+  ) extends CommandOptions {
   }
 
-  def exists(file: String): Boolean = {
-    import java.nio.file.{Paths, Files}
-
-    Files.exists(Paths.get(file))
-  }
-
-  def colname(name: String): Boolean = {
-    name match {
-      case "]" | "cut" | "join" | "insconst" => false
-      case _ => true
-    }
-  }
 }
