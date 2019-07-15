@@ -4,6 +4,11 @@ object CutCommand {
 
   import OptionParser.ForCommand._;
 
+  object CutCommandParser extends CommandParser {
+    def initStatus(lastCommand: CommandOptions, argIdx: Int): CommandParserStatus =
+      CutCommand.CutCommandParserStatus(lastCommand, argIdx, None);
+  }
+
   case class CutCommandParserStatus (
     prevCommand: CommandOptions,
     argIdx: Int,
@@ -20,6 +25,18 @@ object CutCommand {
       } else {
         Left(ParserErrorMessage(argIdx, "unknown argument"));
       }
+    }
+
+    def help = new HelpDocument {
+
+      def isFilePath: Boolean = false;
+      def options: List[String] = Nil;
+      def commandsEnable: Boolean = false;
+
+      def document: String = {
+        "TODO";
+      }
+
     }
 
     def finish: Either[ParserErrorMessage, CommandOptions] = {

@@ -4,19 +4,44 @@ object OptionParser {
 
   object ForCommand {
     type CommandSeqParserStatus = OptionParser.CommandSeqParserStatus;
+    type CommandParser = OptionParser.CommandParser;
     type CommandParserStatus = OptionParser.CommandParserStatus;
     type CommandOptions = OptionParser.CommandOptions;
     type ParserErrorMessage = OptionParser.ParserErrorMessage;
-    val ParserErrorMessage = OptionParser.ParserErrorMessage;
+    val  ParserErrorMessage = OptionParser.ParserErrorMessage;
+    type HelpDocument = OptionParser.HelpDocument;
   }
 
-  def parse(args: List[String], argIdx: Int): Either[ParserErrorMessage, CommandSeqOptions] = {
-    val initArgs = args;
+  def parse(args: List[String], argIdx: Int): Either[ParserMessage, CommandSeqOptions] = {
+    parseCommandSeq(args, argIdx) match {
+      case Left(e) =>
+        Left(e);
+      case Right((opt, args, argIdx)) =>
+        args match {
+          case Nil =>
+            Right(opt);
+          case "]" :: tail =>
+            throw new AssertionError("TODO");
+          case _ =>
+            throw new AssertionError();
+        }
+    }
+  }
+
+  // コマンド列をパースする
+  // パラメータ列の最後に達するか `--help` または `//help` または `]` に達するまでパースする
+  // --help に達したら Left[HelpDocument] を返す
+  def parseCommandSeq(args: List[String], argIdx: Int): Either[ParserMessage, (CommandSeqOptions, List[String], Int)] = {
     @scala.annotation.tailrec
-    def sub(status: CommandSeqParserStatus, args: List[String], argIdx: Int): Either[ParserErrorMessage, CommandSeqOptions] = {
+    def sub(status: CommandSeqParserStatus, args: List[String], argIdx: Int): Either[ParserMessage, (CommandSeqOptions, List[String], Int)] = {
       args match {
         case Nil =>
-          status.finish;
+          status.finish match {
+            case Left(e) =>
+              Left(e);
+            case Right(opt) =>
+              Right((opt, Nil, argIdx));
+          }
         case arg :: tail =>
           status.parse(arg, tail, argIdx) match {
             case Left(e) =>
@@ -39,9 +64,12 @@ object OptionParser {
     lastCommand: CommandParserStatus,
   ) {
 
-    def parse(arg: String, tail: List[String], argIdx: Int): Either[ParserErrorMessage, (CommandSeqParserStatus, List[String], Int)] = {
+    // 1つの引数またはオプションをパースする
+    def parse(arg: String, tail: List[String], argIdx: Int): Either[ParserMessage, (CommandSeqParserStatus, List[String], Int)] = {
       parseCommandSeqParserStatus(this, arg, tail, argIdx);
     }
+
+    def help: HelpDocument = lastCommand.help;
 
     def finish: Either[ParserErrorMessage, CommandSeqOptions] = {
       lastCommand.finish match {
@@ -65,19 +93,33 @@ object OptionParser {
   case object TsvInputFormat extends InputFormat;
   case object CsvInputFormat extends InputFormat;
 
-  case class ParserErrorMessage(argIdx: Int, message: String);
+  sealed trait ParserMessage;
+  case class ParserErrorMessage(argIdx: Int, message: String) extends ParserMessage;
+
+  trait HelpDocument extends ParserMessage {
+    def isFilePath: Boolean;
+    def options: List[String];
+    def commandsEnable: Boolean;
+    def document: String;
+  }
 
   def inputFileExists(file: String): Boolean = {
-    true; // TODO
+    val f = new java.io.File(file);
+    f.exists && f.isFile;
   }
 
   def isOption(arg: String): Boolean = {
-    arg.startsWith("-");
+    arg.startsWith("-") || arg.startsWith("//");
+    // `//` は `//help` を想定したもの
   }
 
-//  trait ArgDocument;
-//
-//  case object GlobalOptionsDocument extends ArgDocument;
+  def isHelp(arg: String): Boolean = {
+    arg == "//help" || arg == "--help";
+  }
+
+  trait CommandParser {
+    def initStatus(lastCommand: CommandOptions, argIdx: Int): CommandParserStatus;
+  }
 
   trait CommandParserStatus {
 
@@ -85,28 +127,29 @@ object OptionParser {
 
     def parseArgument(status: CommandSeqParserStatus, arg: String, tail: List[String], argIdx: Int): Either[ParserErrorMessage, (CommandSeqParserStatus, List[String], Int)];
 
+    def help: HelpDocument;
+
     def finish: Either[ParserErrorMessage, CommandOptions];
 
   }
+
   trait CommandOptions {
   }
 
+  val commands = Map (
+    "cut" -> CutCommand.CutCommandParser,
+  );
+
   object CommandParserStatus {
-    def exists(name: String): Boolean = {
-      name match {
-        case "cut" => true;
-        case _ => false;
-      }
-    }
-    def command(name: String, lastCommand: CommandOptions, argIdx: Int): Option[CommandParserStatus] = {
-      name match {
-        case "cut" => Some(CutCommand.CutCommandParserStatus(lastCommand, argIdx, None));
-        case _ => None;
-      }
-    }
+
+    def exists(name: String): Boolean = commands.contains(name);
+
+    def command(name: String, lastCommand: CommandOptions, argIdx: Int): Option[CommandParserStatus] =
+      commands.get(name).map(_.initStatus(lastCommand, argIdx));
+
   }
 
-  private def parseCommandSeqParserStatus(status: CommandSeqParserStatus, arg: String, tail: List[String], argIdx: Int): Either[ParserErrorMessage, (CommandSeqParserStatus, List[String], Int)] = {
+  private def parseCommandSeqParserStatus(status: CommandSeqParserStatus, arg: String, tail: List[String], argIdx: Int): Either[ParserMessage, (CommandSeqParserStatus, List[String], Int)] = {
     if (isOption(arg)) {
       if (arg == "--tsv") {
         status.inputFormat match {
@@ -126,6 +169,8 @@ object OptionParser {
               case file :: tail2 =>
                 if (inputFileExists(file)) {
                   Right((status.copy(inputFile = Some(file)), tail2, argIdx + 2));
+                } else if (isHelp(file)) {
+                  Left(Document.helpInputFile);
                 } else {
                   Left(ParserErrorMessage(argIdx + 1, "file not found"));
                 }
@@ -133,6 +178,8 @@ object OptionParser {
                 Left(ParserErrorMessage(argIdx, "file path expected"));
             }
         }
+      } else if (isHelp(arg)) {
+        Left(status.help);
       } else {
         status.lastCommand.parseOption(status, arg, tail, argIdx);
       }
@@ -157,6 +204,8 @@ object OptionParser {
     def parseArgument(status: CommandSeqParserStatus, arg: String, tail: List[String], argIdx: Int): Either[ParserErrorMessage, (CommandSeqParserStatus, List[String], Int)] = {
       Left(ParserErrorMessage(argIdx, "unknown argument"));
     }
+
+    def help: HelpDocument = Document.helpGlobalOptions;
 
     def finish: Either[ParserErrorMessage, CommandOptions] = Right(NoCommandOptions);
 

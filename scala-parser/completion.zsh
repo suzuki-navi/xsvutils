@@ -1,16 +1,13 @@
 
 function _xsvutils() {
     (
-        echo $CURRENT
+        local -a args
         for i in $(seq 2 $CURRENT); do
-            echo "${words[i]}"
+            args=($args "${words[i]}")
         done
-    ) > var/debug.txt
-    cat <<EOF > var/comp.txt
-_values 'options' 'one[111]' 'two'
-_files .
-EOF
-    . ./var/comp.txt
+        ./scala-parser complete zsh "${args[@]}"
+    ) > ./var/completion.sh
+    . ./var/completion.sh
 }
 
 compdef _xsvutils run.sh
