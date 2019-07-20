@@ -3,67 +3,73 @@
 object Document {
 
   import OptionParser.HelpDocument;
+  import OptionParser.Completion;
 
   def helpGlobalOptions = new HelpDocument {
+
+    def document: List[String] = List(
+      "--tsv",
+      "--csv",
+    );
+
+  }
+
+  def completionGlobalOptions = new Completion {
 
     def isFilePath: Boolean = true;
     def options: List[String] = List(
       "--tsv",
       "--csv",
       "-i",
+      "-o",
       "--help",
     );
     def commandsEnable: Boolean = true;
 
-    def document: String = {
-      """|--tsv
-         |--csv""".stripMargin;
-    }
-
   }
 
-  def helpInputFile = new HelpDocument {
-
+  def completionInputFile = new Completion {
     def isFilePath: Boolean = true;
     def options: List[String] = Nil;
     def commandsEnable: Boolean = false;
-
-    def document: String = {
-      """|-i <FILEPATH>""".stripMargin;
-    }
-
   }
 
-  def toBashCompletion(help: HelpDocument): List[String] = {
+  def completionOutputFile = new Completion {
+    def isFilePath: Boolean = true;
+    def options: List[String] = Nil;
+    def commandsEnable: Boolean = false;
+  }
+
+  def toBashCompletion(completion: Completion): List[String] = {
     "TODO" :: Nil;
   }
 
-  def toZshCompletion(help: HelpDocument): List[String] = {
+  def toZshCompletion(completion: Completion): List[String] = {
     (
-      if (help.isFilePath) {
+      if (completion.isFilePath) {
         "_files ." :: Nil;
       } else {
         Nil;
       }
     ) ::: (
-      if (!help.options.isEmpty) {
+      if (!completion.options.isEmpty) {
         "local -a op" ::
-        ("op=(" + help.options.map { o =>
+        ("op=(" + completion.options.map { o =>
           "'" + o + "'"; // TODO escape
         }.mkString(" ") + ")") ::
-        "_describe -t opt options op" ::
+        "_describe -t opt option op" ::
         Nil;
       } else {
         Nil;
       }
     ) ::: (
-      if (help.commandsEnable) {
+      if (completion.commandsEnable) {
         val commands: List[String] = OptionParser.commands.keys.toList.sorted;
         "local -a cmd" ::
         ("cmd=(" + commands.map { c =>
           "'" + c + "'"; // TODO escape
         }.mkString(" ") + ")") ::
-        "_describe -t cmd commands cmd" ::
+        "_describe -t cmd command cmd" ::
         Nil;
       } else {
         Nil;

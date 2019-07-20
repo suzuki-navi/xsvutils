@@ -2,28 +2,32 @@
 
 import OptionParser.ForCommand._;
 
-object CutCommandParser extends CommandParser {
+object DiffCommandParser extends CommandParser {
   def initStatus(lastCommand: CommandOptions, argIdx: Int): CommandParserStatus =
-    CutCommandParserStatus(lastCommand, argIdx, None);
+    DiffCommandParserStatus(lastCommand, argIdx, None);
 }
 
-case class CutCommandParserStatus (
+case class DiffCommandParserStatus (
   prevCommand: CommandOptions,
   argIdx: Int,
-  cols: Option[List[String]],
+  otherFile: Option[Either[String, CommandSeqOptions]],
 ) extends CommandParserStatus {
 
   def parseOption(status: CommandSeqParserStatusImpl,
     opt: String, tail: List[String], argIdx: Int, ctxt: OptionParserContext):
     Either[ParserErrorMessage, (CommandSeqParserStatus, List[String], Int)] = {
-    if (opt == "--cols") {
-      if (cols.isEmpty) {
+    if (opt == "--file") {
+      if (otherFile.isEmpty) {
         tail match {
           case arg2 :: tail2 =>
-            Right((status.copy(lastCommand = this.copy(cols = Some(arg2.split(",").toList))), tail2, argIdx + 2));
+            if (ctxt.inputFileExists(arg2)) {
+              Right((status.copy(lastCommand = this.copy(otherFile = Some(Left(arg2)))), tail2, argIdx + 2));
+            } else {
+              Left(ParserErrorMessage(argIdx + 1, "file not found"));
+            }
           case Nil =>
-            Right((CompletionCommandSeqParserStatus(completionCols,
-              ParserErrorMessage(argIdx, "cols expected")), tail, argIdx + 1));
+            Right((CompletionCommandSeqParserStatus(completionFile,
+              ParserErrorMessage(argIdx, "file path expected")), tail, argIdx + 1));
         }
       } else {
         Left(ParserErrorMessage(argIdx, "duplicated option"));
@@ -36,11 +40,11 @@ case class CutCommandParserStatus (
   def parseArgument(status: CommandSeqParserStatusImpl,
     arg: String, tail: List[String], argIdx: Int, ctxt: OptionParserContext):
     Either[ParserErrorMessage, (CommandSeqParserStatus, List[String], Int)] = {
-    if (cols.isEmpty) {
-      Right((status.copy(lastCommand = this.copy(cols = Some(arg.split(",").toList))), tail, argIdx + 1));
-    } else {
+//      if (otherFile.isEmpty) {
+//        Right((status.copy(lastCommand = this.copy(cols = Some(arg.split(",").toList))), tail, argIdx + 1));
+//      } else {
       Left(ParserErrorMessage(argIdx, "unknown argument"));
-    }
+//      }
   }
 
   def help = new HelpDocument {
@@ -50,30 +54,30 @@ case class CutCommandParserStatus (
   }
 
   def completion = new Completion {
-    def isFilePath: Boolean = false;
+    def isFilePath: Boolean = true; // TODO
     def options: List[String] = Nil; // TODO
     def commandsEnable: Boolean = false; // TODO
   }
 
-  private[this] def completionCols = new Completion {
-    def isFilePath: Boolean = false;
+  private[this] def completionFile = new Completion {
+    def isFilePath: Boolean = true;
     def options: List[String] = Nil;
     def commandsEnable: Boolean = false;
   }
 
   def finish: Either[ParserErrorMessage, CommandOptions] = {
-    cols match {
+    otherFile match {
       case None =>
-        Left(ParserErrorMessage(argIdx, "expected --cols option"));
-      case Some(cols) =>
-        Right(SomeCommandOptions(prevCommand, CutCommandNode(cols)));
+        Left(ParserErrorMessage(argIdx, "expected --file option"));
+      case Some(otherFile) =>
+        Right(SomeCommandOptions(prevCommand, DiffCommandNode(otherFile)));
     }
   }
 
 }
 
-case class CutCommandNode (
-  cols: List[String],
+case class DiffCommandNode (
+  otherFile: Either[String, CommandSeqOptions],
 ) extends CommandNode {
 }
 

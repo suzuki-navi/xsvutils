@@ -6,7 +6,7 @@ function _xsvutils() {
             args=($args "${words[i]}")
         done
         ./scala-parser complete zsh "${args[@]}"
-    ) > ./var/completion.sh
+    ) > ./var/completion.sh 2>./var/debug.txt
     . ./var/completion.sh
 }
 
