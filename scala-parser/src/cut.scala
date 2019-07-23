@@ -13,33 +13,34 @@ case class CutCommandParserStatus (
   cols: Option[List[String]],
 ) extends CommandParserStatus {
 
-  def parseOption(status: CommandSeqParserStatusImpl,
+  def parseOption(status: CommandSeqParserStatus,
     opt: String, tail: List[String], argIdx: Int, ctxt: OptionParserContext):
-    Either[ParserErrorMessage, (CommandSeqParserStatus, List[String], Int)] = {
+    (Either[ParserErrorMessage, CommandSeqParserStatus], Option[Completion], Option[(List[String], Int)]) = {
     if (opt == "--cols") {
       if (cols.isEmpty) {
         tail match {
           case arg2 :: tail2 =>
-            Right((status.copy(lastCommand = this.copy(cols = Some(arg2.split(",").toList))), tail2, argIdx + 2));
+            (Right(status.copy(lastCommand = this.copy(cols = Some(arg2.split(",").toList)))),
+              None, Some((tail2, argIdx + 2)));
           case Nil =>
-            Right((CompletionCommandSeqParserStatus(completionCols,
-              ParserErrorMessage(argIdx, "cols expected")), tail, argIdx + 1));
+            (Left(ParserErrorMessage(argIdx, "cols expected")),
+              Some(completionCols), Some((tail, argIdx + 1)));
         }
       } else {
-        Left(ParserErrorMessage(argIdx, "duplicated option"));
+        (Left(ParserErrorMessage(argIdx, "duplicated option")), None, None);
       }
     } else {
-      Left(ParserErrorMessage(argIdx, "unknown option"));
+      (Left(ParserErrorMessage(argIdx, "unknown option")), None, None);
     }
   }
 
-  def parseArgument(status: CommandSeqParserStatusImpl,
+  def parseArgument(status: CommandSeqParserStatus,
     arg: String, tail: List[String], argIdx: Int, ctxt: OptionParserContext):
-    Either[ParserErrorMessage, (CommandSeqParserStatus, List[String], Int)] = {
+    (Either[ParserErrorMessage, CommandSeqParserStatus], Option[Completion], Option[(List[String], Int)]) = {
     if (cols.isEmpty) {
-      Right((status.copy(lastCommand = this.copy(cols = Some(arg.split(",").toList))), tail, argIdx + 1));
+      (Right(status.copy(lastCommand = this.copy(cols = Some(arg.split(",").toList)))), None, Some((tail, argIdx + 1)));
     } else {
-      Left(ParserErrorMessage(argIdx, "unknown argument"));
+      (Left(ParserErrorMessage(argIdx, "unknown argument")), None, None);
     }
   }
 
@@ -61,12 +62,13 @@ case class CutCommandParserStatus (
     def commandsEnable: Boolean = false;
   }
 
-  def finish: Either[ParserErrorMessage, CommandOptions] = {
+  def finish(status: CommandSeqParserStatus):
+    Either[CommandSeqReceiver, Either[ParserErrorMessage, CommandOptions]] = {
     cols match {
       case None =>
-        Left(ParserErrorMessage(argIdx, "expected --cols option"));
+        Right(Left(ParserErrorMessage(argIdx, "expected --cols option")));
       case Some(cols) =>
-        Right(SomeCommandOptions(prevCommand, CutCommandNode(cols)));
+        Right(Right(SomeCommandOptions(prevCommand, CutCommandNode(cols))));
     }
   }
 
@@ -75,5 +77,12 @@ case class CutCommandParserStatus (
 case class CutCommandNode (
   cols: List[String],
 ) extends CommandNode {
+
+  def toTreeString: List[String] = {
+    "name: %s".format("cut") ::
+    "cols: %s".format(cols.mkString(",")) ::
+    Nil;
+  }
+
 }
 

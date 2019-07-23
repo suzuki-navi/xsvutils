@@ -3,8 +3,6 @@
 // コマンドの接続を有向グラフにたとえて表現する
 object CommandGraph {
 
-  import OptionParser.CommandSeqOptions;
-
   case class Commands (nodes: Vector[Node], edges: Vector[Edge]);
 
   // 頂点(ノード) = コマンド
@@ -14,7 +12,7 @@ object CommandGraph {
   // 辺(エッジ) = コマンドとコマンドをつなぐFIFO
   case class Edge ();
 
-  def toCommandGraph(commands: CommandSeqOptions): Unit = {
+  def toCommandGraph(commands: CommandSeq): Unit = {
   }
 
 }

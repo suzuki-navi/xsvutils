@@ -7,12 +7,16 @@ case class CommandSeq (
   commands: Vector[CommandSeq.CommandNode]) {
 
   def toTreeString: List[String] = {
-    "inputFormat: %s".format(inputFormat.map(_.name).getOrElse("")) ::
-    "inputFile: %s".format(inputFile.getOrElse("")) ::
-    "outputFile: %s".format(outputFile.getOrElse("")) ::
+    "inputFormat: %s".format(inputFormat.map(_.name).getOrElse("auto")) ::
+    "inputFile: %s".format(inputFile.getOrElse("->")) ::
+    "outputFile: %s".format(outputFile.getOrElse("->")) ::
     "commands: " ::
-    commands.toList.map(cmd => "  - %s".format(cmd.toString)) :::
-    Nil;
+    (commands.toList.flatMap { cmd =>
+      cmd.toTreeString match {
+        case h :: t => "  - %s".format(h) :: t.map("    " + _);
+        case Nil => "  - " :: Nil;
+      }
+    });
   }
 
 }
@@ -20,11 +24,43 @@ case class CommandSeq (
 object CommandSeq {
 
   trait CommandNode {
+
+    def toTreeString: List[String];
+
   }
 
   sealed trait InputFormat { def name: String }
   case object TsvInputFormat extends InputFormat { def name = "tsv" }
   case object CsvInputFormat extends InputFormat { def name = "csv" }
+
+  def inputFile(file: String) = CommandSeq (
+    inputFormat = None,
+    inputFile = Some(file),
+    outputFile = None,
+    commands = Vector.empty,
+  );
+
+  def apply(
+    inputFormat: Option[InputFormat],
+    inputFile: Option[String],
+    outputFile: Option[String],
+    lastCommand: OptionParser.CommandOptions,
+  ): CommandSeq = {
+    @scala.annotation.tailrec
+    def sub(cmd: OptionParser.CommandOptions, seq: List[CommandNode]): CommandSeq = {
+      cmd match {
+        case OptionParser.NoneCommandOptions =>
+          CommandSeq(
+            inputFormat,
+            inputFile,
+            outputFile,
+            seq.toVector);
+        case cmd: OptionParser.SomeCommandOptions =>
+          sub(cmd.prevCommand, cmd.command :: seq);
+      }
+    }
+    sub(lastCommand, Nil);
+  }
 
 }
 
