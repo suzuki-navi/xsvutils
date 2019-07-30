@@ -15,22 +15,22 @@ case class CutCommandParserStatus (
 
   def parseOption(status: CommandSeqParserStatus,
     opt: String, tail: List[String], argIdx: Int, ctxt: OptionParserContext):
-    (Either[ParserErrorMessage, CommandSeqParserStatus], Option[Completion], Option[(List[String], Int)]) = {
+    Option[(Either[ParserErrorMessage, CommandSeqParserStatus], Option[Completion], Option[(List[String], Int)])] = {
     if (opt == "--cols") {
       if (cols.isEmpty) {
         tail match {
           case arg2 :: tail2 =>
-            (Right(status.copy(lastCommand = this.copy(cols = Some(arg2.split(",").toList)))),
-              None, Some((tail2, argIdx + 2)));
+            Some((Right(status.copy(lastCommand = this.copy(cols = Some(arg2.split(",").toList)))),
+              None, Some((tail2, argIdx + 2))));
           case Nil =>
-            (Left(ParserErrorMessage(argIdx, "cols expected")),
-              Some(completionCols), Some((tail, argIdx + 1)));
+            Some((Left(ParserErrorMessage(argIdx, "cols expected")),
+              Some(completionCols), Some((tail, argIdx + 1))));
         }
       } else {
-        (Left(ParserErrorMessage(argIdx, "duplicated option")), None, None);
+        Some((Left(ParserErrorMessage(argIdx, "duplicated option")), None, None));
       }
     } else {
-      (Left(ParserErrorMessage(argIdx, "unknown option")), None, None);
+      None;
     }
   }
 
@@ -68,15 +68,33 @@ case class CutCommandParserStatus (
       case None =>
         Right(Left(ParserErrorMessage(argIdx, "expected --cols option")));
       case Some(cols) =>
-        Right(Right(SomeCommandOptions(prevCommand, CutCommandNode(cols))));
+        Right(Right(SomeCommandOptions(prevCommand, CutCommandSeqNode(cols))));
     }
   }
 
 }
 
-case class CutCommandNode (
+case class CutCommandSeqNode (
   cols: List[String],
-) extends CommandNode {
+) extends CommandSeqNode {
+
+  // コマンド実装時向けのコメント
+  // 出力がTSV形式かどうか。
+  // TSV形式で出力するコマンドでは true、
+  // そうでない場合は falseとする。
+  def isOutputTsv: Boolean = true;
+
+  // コマンド実装時向けのコメント
+  // CommandGraphにてノードとして扱うかどうか・
+  // シンプルな入出力のコマンドでは false
+  def isCommandGraphNode: Boolean = false;
+
+  def addNodeToGraph(graph: CommandGraph,
+    prevCommands: Vector[CommandSeqNode], nextCommands: Vector[CommandSeqNode],
+    inputEdgeId: Int, outputEdgeId: Int): CommandGraph = {
+    // isCommandGraphNode = false ではこのメソッドは呼び出されない
+    throw new AssertionError();
+  }
 
   def toTreeString: List[String] = {
     "name: %s".format("cut") ::

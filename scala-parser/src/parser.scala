@@ -11,17 +11,12 @@ object OptionParser {
     type CommandOptions = OptionParser.CommandOptions;
     type SomeCommandOptions = OptionParser.SomeCommandOptions;
     val  SomeCommandOptions = OptionParser.SomeCommandOptions;
-    type CommandNode = CommandSeq.CommandNode;
     type ParserErrorMessage = OptionParser.ParserErrorMessage;
     val  ParserErrorMessage = OptionParser.ParserErrorMessage;
     type HelpDocument = OptionParser.HelpDocument;
     type Completion = OptionParser.Completion;
     type CommandSeqReceiver = OptionParser.CommandSeqReceiver;
   }
-
-  import CommandSeq.InputFormat;
-  import CommandSeq.TsvInputFormat;
-  import CommandSeq.CsvInputFormat;
 
   trait OptionParserContext {
     def inputFileExists(file: String): Boolean;
@@ -153,7 +148,15 @@ object OptionParser {
 
     def finish: Either[ParserErrorMessage, CommandSeq] = finish("", 0, 0);
 
-    // inputType, outputType について
+    // inputType
+    //   0: inputFile = Some(_)
+    //   1: inputFile = Some(_) or None
+    //   2: inputFile = None
+    // outputType
+    //   0: outputFile = Some(_)
+    //   2: outputFile = None
+    // 
+    // サブコマンドごとの例
     //   join, paste, union のパラメータとしてのサブコマンド
     //     input:  標準入力または外部ファイルまたはjoinなどの入力をtee
     //       inputType = 1;
@@ -251,9 +254,14 @@ object OptionParser {
 
   trait CommandParserStatus {
 
+    // 返すパターン
+    //   ParserErrorMessage
+    //   ParserErrorMessage, Completion
+    //   CommandSeq, tail
+    // このコマンドでは不明なオプションの場合はNoneを返す
     def parseOption(status: CommandSeqParserStatus,
       opt: String, tail: List[String], argIdx: Int, ctxt: OptionParserContext):
-      (Either[ParserErrorMessage, CommandSeqParserStatus], Option[Completion], Option[(List[String], Int)]);
+      Option[(Either[ParserErrorMessage, CommandSeqParserStatus], Option[Completion], Option[(List[String], Int)])];
 
     def parseArgument(status: CommandSeqParserStatus,
       arg: String, tail: List[String], argIdx: Int, ctxt: OptionParserContext):
@@ -268,12 +276,18 @@ object OptionParser {
 
   }
 
-  sealed trait CommandOptions;
+  sealed trait CommandOptions {
+    def isOutputTsv: Boolean;
+  }
 
   // NoneCommandOptions 以外のすべての CommandOptions は SomeCommandOptions
   case class SomeCommandOptions (
     prevCommand: CommandOptions,
-    command: CommandSeq.CommandNode) extends CommandOptions;
+    command: CommandSeqNode) extends CommandOptions {
+
+    def isOutputTsv: Boolean = command.isOutputTsv;
+
+  }
 
   val commands = Map (
     "cut" -> CutCommandParser,
@@ -293,7 +307,11 @@ object OptionParser {
     arg: String, tail: List[String], argIdx: Int, ctxt: OptionParserContext):
     (Either[ParserErrorMessage, CommandSeqParserStatus], Option[Completion], Option[(List[String], Int)]) = {
     if (isOption(arg)) {
-      if (arg == "--tsv") {
+      val r = status.lastCommand.parseOption(status, arg, tail, argIdx, ctxt);
+      if (r.isDefined) {
+        // コマンドのオプションとして解釈できたケース
+        r.get;
+      } else if (arg == "--tsv") {
         status.inputFormat match {
           case Some(_) =>
             (Left(ParserErrorMessage(argIdx, "duplicated option")), None, None);
@@ -342,7 +360,7 @@ object OptionParser {
           (Left(ParserErrorMessage(argIdx, "duplicated option")), None, None);
         }
       } else {
-        status.lastCommand.parseOption(status, arg, tail, argIdx, ctxt);
+        (Left(ParserErrorMessage(argIdx, "unknown option")), None, None);
       }
     } else { // - 以外で始まる引数
       if (commandExists(arg)) {
@@ -355,8 +373,12 @@ object OptionParser {
           case Right(Left(err)) =>
             (Left(err), None, None);
           case Right(Right(cmd)) =>
-            (Right(status.copy(lastCommand = commandParserStatus(arg, cmd, argIdx).get)),
-              None, Some((tail, argIdx + 1)));
+            if (cmd.isOutputTsv) {
+              (Right(status.copy(lastCommand = commandParserStatus(arg, cmd, argIdx).get)),
+                None, Some((tail, argIdx + 1)));
+            } else {
+              (Left(ParserErrorMessage(argIdx, "command not allowd here")), None, None);
+            }
         }
       } else if (ctxt.inputFileExists(arg) && status.inputFile.isEmpty) {
         (Right(status.copy(inputFile = Some(arg), inputFileArgIdx = argIdx)), None, Some((tail, argIdx + 1)));
@@ -384,8 +406,8 @@ object OptionParser {
 
     def parseOption(status: CommandSeqParserStatus,
       opt: String, tail: List[String], argIdx: Int, ctxt: OptionParserContext):
-      (Either[ParserErrorMessage, CommandSeqParserStatus], Option[Completion], Option[(List[String], Int)]) = {
-      (Left(ParserErrorMessage(argIdx, "unknown option")), None, None);
+      Option[(Either[ParserErrorMessage, CommandSeqParserStatus], Option[Completion], Option[(List[String], Int)])] = {
+      None;
     }
 
     def parseArgument(status: CommandSeqParserStatus,
@@ -404,6 +426,10 @@ object OptionParser {
 
   }
 
-  case object NoneCommandOptions extends CommandOptions;
+  case object NoneCommandOptions extends CommandOptions {
+
+    def isOutputTsv: Boolean = true;
+
+  }
 
 }

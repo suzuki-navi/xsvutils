@@ -1,10 +1,10 @@
 // mulang-bin-sources: scala
 
 case class CommandSeq (
-  inputFormat: Option[CommandSeq.InputFormat],
+  inputFormat: Option[InputFormat],
   inputFile: Option[String], // 空文字列は標準入力の意味、Noneはjoinなどの入力を引き継ぐ意味
   outputFile: Option[String], // 空文字列は標準出力の意味、Noneはjoinなどへの出力の意味
-  commands: Vector[CommandSeq.CommandNode]) {
+  commands: Vector[CommandSeqNode]) {
 
   def toTreeString: List[String] = {
     "inputFormat: %s".format(inputFormat.map(_.name).getOrElse("auto")) ::
@@ -19,19 +19,13 @@ case class CommandSeq (
     });
   }
 
+  def toCommandGraph: CommandGraph = {
+    throw new AssertionError("TODO");
+  }
+
 }
 
 object CommandSeq {
-
-  trait CommandNode {
-
-    def toTreeString: List[String];
-
-  }
-
-  sealed trait InputFormat { def name: String }
-  case object TsvInputFormat extends InputFormat { def name = "tsv" }
-  case object CsvInputFormat extends InputFormat { def name = "csv" }
 
   def inputFile(file: String) = CommandSeq (
     inputFormat = None,
@@ -47,7 +41,7 @@ object CommandSeq {
     lastCommand: OptionParser.CommandOptions,
   ): CommandSeq = {
     @scala.annotation.tailrec
-    def sub(cmd: OptionParser.CommandOptions, seq: List[CommandNode]): CommandSeq = {
+    def sub(cmd: OptionParser.CommandOptions, seq: List[CommandSeqNode]): CommandSeq = {
       cmd match {
         case OptionParser.NoneCommandOptions =>
           CommandSeq(
@@ -63,4 +57,26 @@ object CommandSeq {
   }
 
 }
+
+trait CommandSeqNode {
+
+  // 出力がTSV形式かどうか
+  // TSV形式でない場合はこの後ろに次のコマンドを配置することができない
+  def isOutputTsv: Boolean;
+
+  // CommandGraphにてノードとして扱うかどうか
+  def isCommandGraphNode: Boolean;
+
+  // CommandGraphにてノードとして扱う場合に前後のコマンド列を含めてエッジとして追加する
+  def addNodeToGraph(graph: CommandGraph,
+    prevCommands: Vector[CommandSeqNode], nextCommands: Vector[CommandSeqNode],
+    inputEdgeId: Int, outputEdgeId: Int): CommandGraph;
+
+  def toTreeString: List[String];
+
+}
+
+sealed trait InputFormat { def name: String }
+case object TsvInputFormat extends InputFormat { def name = "tsv" }
+case object CsvInputFormat extends InputFormat { def name = "csv" }
 
