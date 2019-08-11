@@ -60,8 +60,8 @@ object Main {
     System.err.println(help); // TODO
   }
 
-  private def execCommands(parserStatus: OptionParserStatus): Unit = {
-    System.err.println(parserStatus); // TODO
+  private def execCommands(parserStatus: CommandSeqParserStatus): Unit = {
+    pprint.pprintln(parserStatus); // TODO
   }
 
 }
