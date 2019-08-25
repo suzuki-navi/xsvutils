@@ -9,6 +9,13 @@ trait Completion {
 
 object Completion {
 
+  def files = new Completion {
+    def isFilePath: Boolean = true;
+    def parameters: List[String] = Nil;
+    def options: List[String] = Nil;
+    def commandsEnable: Boolean = false;
+  }
+
   def toZshCompletion(completion: Completion): List[String] = {
     (
       if (completion.isFilePath) {

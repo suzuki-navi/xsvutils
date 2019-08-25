@@ -12,19 +12,27 @@ case class DiffCommandParserStatus (
   tail: Option[Either[CommandSeqParserStatus, CommandNodeSeq]],
 ) extends CommandParserStatus {
 
-  def help: HelpDocument = throw new AssertionError("TODO");
+  def help: HelpDocument = HelpDocument("diff");
 
   def eatOption(opt: String, tail: List[String], argIdx: Int, isCompletion: Boolean,
     ctxt: OptionParserContext):
     Option[(Either3[CommandParserStatus, ParserErrorMessage, Completion], Option[(List[String], Int)])] = {
-    if (opt == "--file") {
+    if (opt == "[") {
+      if (other.isEmpty) {
+        val childStatus = CommandSeqParserStatus.init(CommandSeqInputType.SomeInputOrNone, CommandSeqOutputType.NoneOutput);
+        Some((Option3A(this.copy(other = Some(Left(childStatus))))), Some((tail, argIdx + 1)));
+      } else {
+        Some((Option3B(ParserErrorMessage(argIdx, "duplicated option")), None));
+      }
+    } else if (opt == "--file" || opt == "--other") {
       if (other.isEmpty) {
         tail match {
+          case arg :: Nil if isCompletion =>
+            Some((Option3C(Completion.files), None));
           case arg :: tail2 =>
             if (ctxt.inputFileExists(arg)) {
-//              val other = CommandSeq.inputFile(arg);
-//              Some((Right(status.copy(lastCommand = this.copy(other = Some(other)))),
-//                Some((tail2, argIdx + 2))));
+              val other = CommandNodeSeq.inputFile(arg, argIdx);
+              Some((Option3A(this.copy(other = Some(Right(other)))), Some(tail2, argIdx + 2)));
             } else {
               Some((Option3B(ParserErrorMessage(argIdx + 1, "file not found")), None));
             }
@@ -33,10 +41,11 @@ case class DiffCommandParserStatus (
               Some((tail, argIdx + 1))));
         }
       } else {
+        Some((Option3B(ParserErrorMessage(argIdx, "duplicated option")), None));
       }
     } else {
+      None;
     }
-    throw new AssertionError("TODO");
   }
 
   def eatArgument(arg: String, tail: List[String], argIdx: Int, isCompletion: Boolean,
@@ -45,17 +54,97 @@ case class DiffCommandParserStatus (
     throw new AssertionError("TODO");
   }
 
-  def childParser: Option[ChildCommandSeqParser] = throw new AssertionError("TODO");
+  def eatTail: Option[CommandParserStatus] = {
+    other match {
+      case None => None; // このあとのfinishでエラーの扱いとなるはず
+      case Some(Left(_)) =>
+        throw new AssertionError(); // ここにはこないはず
+      case Some(Right(otherCommands)) =>
+        tail match {
+          case Some(_) =>
+            throw new AssertionError(); // ここにはこないはず
+          case None => None;
+            val tailStatus = CommandSeqParserStatus.init(
+              CommandSeqInputType.NoneInput, CommandSeqOutputType.NoneOutput);
+            Some(this.copy(tail = Some(Left(tailStatus))));
+        }
+    }
+  }
 
-  def tailParser: Option[TailCommandSeqParser] = throw new AssertionError("TODO");
+  def childOrTailParser: Option[ChildOrTailCommandSeqParser] = {
+    (other, tail) match {
+      case (None, _) =>
+        None;
+      case (Some(Left(childStatus)), _) =>
+        Some(new ChildOrTailCommandSeqParser {
+          def isTail: Boolean = false;
+          def status: CommandSeqParserStatus = childStatus;
+          def updateStatus(status: CommandSeqParserStatus): CommandParserStatus = {
+            DiffCommandParserStatus.this.copy(other = Some(Left(status)));
+          }
+          def endStatus(commands: CommandNodeSeq): CommandParserStatus = {
+            DiffCommandParserStatus.this.copy(other = Some(Right(commands)));
+          }
+        });
+      case (Some(Right(_)), None) =>
+        None;
+      case (Some(Right(_)), Some(Right(_))) =>
+        None;
+      case (Some(Right(_)), Some(Left(tailStatus))) =>
+        Some(new ChildOrTailCommandSeqParser {
+          def isTail: Boolean = true;
+          def status: CommandSeqParserStatus = tailStatus;
+          def updateStatus(status: CommandSeqParserStatus): CommandParserStatus = {
+            DiffCommandParserStatus.this.copy(tail = Some(Left(status)));
+          }
+          def endStatus(commands: CommandNodeSeq): CommandParserStatus = {
+            DiffCommandParserStatus.this.copy(tail = Some(Right(commands)));
+          }
+        });
+    }
+  }
 
   def finish: Either[ParserErrorMessage, CommandNode] = {
-    throw new AssertionError("TODO");
+    try {
+      val newOther: Option[CommandNodeSeq] = other match {
+        case None =>
+          throw ParserErrorMessage(argIdx, "option `--other` expected").toException;
+        case Some(Left(status)) =>
+          status.finish match {
+            case Left(err) =>
+              throw err.toException;
+            case Right(cmds) =>
+              Some(cmds);
+          }
+        case Some(Right(cmds)) =>
+          Some(cmds);
+      }
+      val newTail: Vector[CommandNode] = tail match {
+        case None =>
+          Vector.empty;
+        case Some(Left(status)) =>
+          status.finish match {
+            case Left(err) =>
+              throw err.toException;
+            case Right(cmds) =>
+              cmds.commands;
+          }
+        case Some(Right(cmds)) =>
+          cmds.commands;
+      }
+      Right(DiffCommandNode(newOther, newTail));
+    } catch {
+      case ParserException(msg) =>
+        Left(msg);
+    }
   }
 
   def completion = new Completion {
-    def isFilePath: Boolean = true;
+
+    def isFilePath: Boolean = other.isEmpty;
+
     def parameters: List[String] = Nil;
+
     def options: List[String] = {
       if (other.isEmpty) {
         "--other" :: "[" :: Nil;
@@ -63,17 +152,21 @@ case class DiffCommandParserStatus (
         Nil;
       }
     }
+
     def commandsEnable: Boolean = {
       finish match {
         case Left(_) => false;
         case Right(_) => true;
       }
     }
+
   }
 
 }
 
 case class DiffCommandNode (
+  other: Option[CommandNodeSeq],
+  tail: Vector[CommandNode],
 ) extends CommandNode {
 
 }

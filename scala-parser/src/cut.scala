@@ -11,7 +11,7 @@ case class CutCommandParserStatus (
   cols: Option[List[String]],
 ) extends CommandParserStatus {
 
-  def help: HelpDocument = throw new AssertionError("TODO");
+  def help: HelpDocument = HelpDocument("cut");
 
   def eatOption(opt: String, tail: List[String], argIdx: Int, isCompletion: Boolean,
     ctxt: OptionParserContext):
@@ -45,14 +45,14 @@ case class CutCommandParserStatus (
     }
   }
 
-  def childParser: Option[ChildCommandSeqParser] = None;
+  def eatTail: Option[CommandParserStatus] = None;
 
-  def tailParser: Option[TailCommandSeqParser] = None;
+  def childOrTailParser: Option[ChildOrTailCommandSeqParser] = None;
 
   def finish: Either[ParserErrorMessage, CommandNode] = {
     cols match {
       case None =>
-        Left(ParserErrorMessage(argIdx, "expected --cols option"));
+        Left(ParserErrorMessage(argIdx, "option `--cols` expected"));
       case Some(cols) =>
         Right(CutCommandNode(cols));
     }

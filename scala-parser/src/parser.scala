@@ -3,12 +3,12 @@
 object OptionParser {
 
   def parseCommands(args: List[String], ctxt: OptionParserContext):
-    Either3[CommandSeqParserStatus, ParserErrorMessage, HelpDocument] = {
+    Either3[CommandNodeSeq, ParserErrorMessage, HelpDocument] = {
     parse(args, false, ctxt) match {
-      case Option4A(status) => Option3A(status);
-      case Option4B(err) =>    Option3B(err);
-      case Option4C(help) =>   Option3C(help);
-      case Option4D(cmpl) =>   throw new AssertionError(); // ここにはこないはず
+      case Option4A(commands) => Option3A(commands);
+      case Option4B(err) =>      Option3B(err);
+      case Option4C(help) =>     Option3C(help);
+      case Option4D(cmpl) =>     throw new AssertionError(); // ここにはこないはず
     }
   }
 
@@ -22,7 +22,7 @@ object OptionParser {
   }
 
   private[this] def parse(args: List[String], isCompletion: Boolean, ctxt: OptionParserContext):
-    Either4[CommandSeqParserStatus, ParserErrorMessage, HelpDocument, Completion] = {
+    Either4[CommandNodeSeq, ParserErrorMessage, HelpDocument, Completion] = {
 
     @scala.annotation.tailrec
     def sub(status: CommandSeqParserStatus, args: List[String], argIdx: Int):
@@ -49,7 +49,21 @@ object OptionParser {
     }
 
     val status = CommandSeqParserStatus.init(CommandSeqInputType.SomeInput, CommandSeqOutputType.SomeOutput);
-    sub(status, args, 0);
+    sub(status, args, 0) match {
+      case Option4A(status) =>
+        status.finish match {
+          case Left(err) =>
+            Option4B(err);
+          case Right(cmds) =>
+            Option4A(cmds);
+        }
+      case Option4B(err) =>
+        Option4B(err);
+      case Option4C(help) =>
+        Option4C(help);
+      case Option4D(cmpl) =>
+        Option4D(cmpl);
+    }
   }
 
   def isOption(arg: String): Boolean = {
@@ -82,7 +96,6 @@ trait OptionParserContext {
 //   - シェル補完
 //     - 次のコマンド名
 //     - 入力中のコマンドのオプション
-//     - カラム名
 //     - 入出力ファイル名
 case class CommandSeqParserStatus (
   inputType: CommandSeqInputType,
@@ -94,63 +107,58 @@ case class CommandSeqParserStatus (
   outputFileArgIdx: Int,
   commands: Vector[CommandNode],
   lastCommand: CommandParserStatus,
-  childOrTailStatus: Option[Either[CommandSeqParserStatus, CommandSeqParserStatus]],
 ) {
 
   def eat(arg: String, tail: List[String], argIdx: Int, isCompletion: Boolean,
     ctxt: OptionParserContext):
     (Either5[CommandSeqParserStatus, ParserErrorMessage, HelpDocument, Completion, SeqEnd.type],
       Option[(List[String], Int)]) = {
-    lastCommand.childParser match {
-      case None =>
-        eat3(arg, tail, argIdx, isCompletion, ctxt);
-      case Some(childParser) =>
-        this.copy(childOrTailStatus = Some(Left(childParser.initStatus))).
-          eat(arg, tail, argIdx, isCompletion, ctxt);
-    }
+    eat3(arg, tail, argIdx, isCompletion, ctxt);
   }
 
   private[this] def eat3(arg: String, tail: List[String], argIdx: Int, isCompletion: Boolean,
     ctxt: OptionParserContext):
     (Either5[CommandSeqParserStatus, ParserErrorMessage, HelpDocument, Completion, SeqEnd.type],
       Option[(List[String], Int)]) = {
-    childOrTailStatus match {
+    lastCommand.childOrTailParser match {
       case None =>
         eat4(arg, tail, argIdx, isCompletion, ctxt);
-      case Some(Left(childStatus)) =>
-        childStatus.eat(arg, tail, argIdx, isCompletion, ctxt) match {
-          case (Option5A(status), opt) =>
-            (Option5A(this.copy(childOrTailStatus = Some(Left(status)))), opt);
-          case (Option5B(err), opt) =>
-            (Option5B(err), opt);
-          case (Option5C(help), opt) =>
-            (Option5C(help), opt);
-          case (Option5D(cmpl), opt) =>
-            //val cmpl2 = new Completion { // TODO "]" を補完
-            //}
-            (Option5D(cmpl), opt);
-          case (Option5E(SeqEnd), opt) =>
-            childStatus.finish match {
-              case Left(err) =>
-                (Option5B(err), None);
-              case Right(cmds) =>
-                val newLastCommand = lastCommand.childParser.get.endStatus(cmds);
-                (Option5A(this.copy(lastCommand = newLastCommand, childOrTailStatus = None)),
-                  Some((tail, argIdx + 1)));
-            }
-        }
-      case Some(Right(tailStatus)) =>
-        tailStatus.eat(arg, tail, argIdx, isCompletion, ctxt) match {
-          case (Option5A(status), opt) =>
-            (Option5A(this.copy(childOrTailStatus = Some(Right(status)))), opt);
-          case (Option5B(err), opt) =>
-            (Option5B(err), opt);
-          case (Option5C(help), opt) =>
-            (Option5C(help), opt);
-          case (Option5D(cmpl), opt) =>
-            (Option5D(cmpl), opt);
-          case (Option5E(SeqEnd), opt) =>
-            (Option5E(SeqEnd), opt);
+      case Some(childOrTailParser) =>
+        if (childOrTailParser.isTail) {
+          childOrTailParser.status.eat(arg, tail, argIdx, isCompletion, ctxt) match {
+            case (Option5A(status), opt) =>
+              (Option5A(this.copy(lastCommand = childOrTailParser.updateStatus(status))), opt);
+            case (Option5B(err), opt) =>
+              (Option5B(err), opt);
+            case (Option5C(help), opt) =>
+              (Option5C(help), opt);
+            case (Option5D(cmpl), opt) =>
+              (Option5D(cmpl), opt);
+            case (Option5E(SeqEnd), opt) =>
+              (Option5E(SeqEnd), opt);
+          }
+        } else {
+          childOrTailParser.status.eat(arg, tail, argIdx, isCompletion, ctxt) match {
+            case (Option5A(status), opt) =>
+              (Option5A(this.copy(lastCommand = childOrTailParser.updateStatus(status))), opt);
+            case (Option5B(err), opt) =>
+              (Option5B(err), opt);
+            case (Option5C(help), opt) =>
+              (Option5C(help), opt);
+            case (Option5D(cmpl), opt) =>
+              //val cmpl2 = new Completion { // TODO "]" を補完
+              //}
+              (Option5D(cmpl), opt);
+            case (Option5E(SeqEnd), opt) =>
+              childOrTailParser.status.finish match {
+                case Left(err) =>
+                  (Option5B(err), None);
+                case Right(cmds) =>
+                  val newLastCommand = childOrTailParser.endStatus(cmds);
+                  (Option5A(this.copy(lastCommand = newLastCommand)),
+                    Some((tail, argIdx + 1)));
+              }
+          }
         }
     }
   }
@@ -200,7 +208,7 @@ case class CommandSeqParserStatus (
         // コマンド名と同じ名前のファイルが偶然存在していたとしてもコマンド名を優先する。
         // 実行環境による解釈の揺れを少しでも減らすため。
         val nextCommand = OptionParser.command(arg, argIdx);
-        lastCommand.tailParser match {
+        lastCommand.eatTail match {
           case None =>
             if (lastCommand == NoneCommandParserStatus) {
               (Option5A(this.copy(lastCommand = nextCommand)),
@@ -214,8 +222,8 @@ case class CommandSeqParserStatus (
                     Some((tail, argIdx + 1)));
               }
             }
-          case Some(tailParser) =>
-            (Option5A(this.copy(childOrTailStatus = Some(Right(tailParser.initStatus)))),
+          case Some(status) =>
+            (Option5A(this.copy(lastCommand = status)),
               Some((arg :: tail, argIdx)));
         }
       } else if (ctxt.inputFileExists(arg) && inputFile.isEmpty) {
@@ -282,7 +290,7 @@ case class CommandSeqParserStatus (
               case Nil =>
                 (Option3B(ParserErrorMessage(argIdx, "file path expected")), None);
               case arg :: Nil if isCompletion =>
-                (Option3C(fileCompletion), None);
+                (Option3C(Completion.files), None);
               case arg :: tail2 =>
                 if (ctxt.inputFileExists(arg)) {
                   (Option3A(this.copy(inputFile = Some(arg), inputFileArgIdx = argIdx + 1)),
@@ -305,7 +313,7 @@ case class CommandSeqParserStatus (
               case Nil =>
                 (Option3B(ParserErrorMessage(argIdx, "file path expected")), None);
               case arg :: Nil if isCompletion =>
-                (Option3C(fileCompletion), None);
+                (Option3C(Completion.files), None);
               case arg :: tail2 =>
                 (Option3A(this.copy(outputFile = Some(arg), outputFileArgIdx = argIdx + 1)),
                   Some((tail2, argIdx + 2)));
@@ -318,7 +326,23 @@ case class CommandSeqParserStatus (
   }
 
   def finish: Either[ParserErrorMessage, CommandNodeSeq] = {
-    throw new AssertionError("TODO");
+    val (newCommands, errorOpt: Option[ParserErrorMessage]) = if (lastCommand == NoneCommandParserStatus) {
+      (commands, None);
+    } else {
+      lastCommand.finish match {
+        case Left(err) =>
+          (commands, Some(err));
+        case Right(newCommand) =>
+          (commands :+ newCommand, None);
+      }
+    }
+    errorOpt match {
+      case Some(err) =>
+        Left(err);
+      case None =>
+        Right(CommandNodeSeq(inputType, outputType, inputFormat,
+          inputFile, outputFile, inputFileArgIdx, outputFileArgIdx, newCommands));
+    }
   }
 
   private[this] def completion = new Completion {
@@ -355,13 +379,6 @@ case class CommandSeqParserStatus (
 
   }
 
-  private[this] def fileCompletion = new Completion {
-    def isFilePath: Boolean = true;
-    def parameters: List[String] = Nil;
-    def options: List[String] = Nil;
-    def commandsEnable: Boolean = false;
-  }
-
 }
 
 object CommandSeqParserStatus {
@@ -376,16 +393,19 @@ object CommandSeqParserStatus {
     outputFileArgIdx = 0,
     commands = Vector.empty,
     lastCommand = NoneCommandParserStatus,
-    childOrTailStatus = None,
   );
 
 }
 
-case class ParserErrorMessage(argIdx: Int, message: String);
+case class ParserErrorMessage(argIdx: Int, message: String) {
+  def toException = new ParserException(this);
+}
 
 case class HelpDocument(name: String);
 
 case object SeqEnd;
+
+case class ParserException(msg: ParserErrorMessage) extends Exception(msg.toString);
 
 case class CommandNodeSeq (
   inputType: CommandSeqInputType,
@@ -397,6 +417,23 @@ case class CommandNodeSeq (
   outputFileArgIdx: Int,
   commands: Vector[CommandNode],
 ) {
+}
+
+object CommandNodeSeq {
+
+  def inputFile(fname: String, inputFileArgIdx: Int): CommandNodeSeq = {
+    CommandNodeSeq(
+      inputType = CommandSeqInputType.SomeInput,
+      outputType = CommandSeqOutputType.NoneOutput,
+      inputFormat = None,
+      inputFile = Some(fname),
+      outputFile = None,
+      inputFileArgIdx = inputFileArgIdx,
+      outputFileArgIdx = 0,
+      commands = Vector.empty,
+    );
+  }
+
 }
 
 sealed trait InputFormat { def name: String }
@@ -465,9 +502,9 @@ trait CommandParserStatus {
     ctxt: OptionParserContext):
     Option[(Either3[CommandParserStatus, ParserErrorMessage, Completion], Option[(List[String], Int)])];
 
-  def childParser: Option[ChildCommandSeqParser];
+  def eatTail: Option[CommandParserStatus];
 
-  def tailParser: Option[TailCommandSeqParser];
+  def childOrTailParser: Option[ChildOrTailCommandSeqParser];
 
   def finish: Either[ParserErrorMessage, CommandNode];
 
@@ -475,17 +512,13 @@ trait CommandParserStatus {
 
 }
 
-trait ChildCommandSeqParser {
+trait ChildOrTailCommandSeqParser {
 
-  def initStatus: CommandSeqParserStatus;
+  def isTail: Boolean;
 
-  def endStatus(commands: CommandNodeSeq): CommandParserStatus;
+  def status: CommandSeqParserStatus;
 
-}
-
-trait TailCommandSeqParser {
-
-  def initStatus: CommandSeqParserStatus;
+  def updateStatus(status: CommandSeqParserStatus): CommandParserStatus;
 
   def endStatus(commands: CommandNodeSeq): CommandParserStatus;
 
@@ -509,11 +542,9 @@ case object NoneCommandParserStatus extends CommandParserStatus {
     None;
   }
 
-  def childParser: Option[ChildCommandSeqParser] = {
-    None;
-  }
+  def eatTail: Option[CommandParserStatus] = None;
 
-  def tailParser: Option[TailCommandSeqParser] = {
+  def childOrTailParser: Option[ChildOrTailCommandSeqParser] = {
     None;
   }
 

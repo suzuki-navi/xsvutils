@@ -9,8 +9,8 @@ object Main {
         throw new Exception("command expected");
       case "exec" :: args =>
         OptionParser.parseCommands(args, ctxt) match {
-          case Option3A(status) =>
-            execCommands(status);
+          case Option3A(commands) =>
+            execCommands(commands);
           case Option3B(err) =>
             error(err, args);
           case Option3C(help) =>
@@ -50,8 +50,8 @@ object Main {
     System.err.println(help); // TODO
   }
 
-  private def execCommands(parserStatus: CommandSeqParserStatus): Unit = {
-    pprint.pprintln(parserStatus); // TODO
+  private def execCommands(commands: CommandNodeSeq): Unit = {
+    pprint.pprintln(commands); // TODO
   }
 
 }
