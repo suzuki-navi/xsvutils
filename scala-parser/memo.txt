@@ -23,3 +23,15 @@
 
 - src ディレクトリにScalaパーサのソースを追加、 main.pl から
 
+
+## メモ
+
+実行例
+
+    $ ./run.sh ../test/data/sample-3.tsv
+
+補完
+
+    $ . ./completion.zsh
+    $ ./run.sh ../test/data/sample-3.tsv [TAB]
+

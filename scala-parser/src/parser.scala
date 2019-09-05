@@ -3,7 +3,7 @@
 object OptionParser {
 
   def parseCommands(args: List[String], ctxt: OptionParserContext):
-    Either3[CommandNodeSeq, ParserErrorMessage, HelpDocument] = {
+    Either3[CommandGraph, ParserErrorMessage, HelpDocument] = {
     parse(args, false, ctxt) match {
       case Option4A(commands) => Option3A(commands);
       case Option4B(err) =>      Option3B(err);
@@ -22,7 +22,7 @@ object OptionParser {
   }
 
   private[this] def parse(args: List[String], isCompletion: Boolean, ctxt: OptionParserContext):
-    Either4[CommandNodeSeq, ParserErrorMessage, HelpDocument, Completion] = {
+    Either4[CommandGraph, ParserErrorMessage, HelpDocument, Completion] = {
 
     @scala.annotation.tailrec
     def sub(status: CommandSeqParserStatus, args: List[String], argIdx: Int):
@@ -49,13 +49,14 @@ object OptionParser {
     }
 
     val status = CommandSeqParserStatus.init(CommandSeqInputType.SomeInput, CommandSeqOutputType.SomeOutput);
+
     sub(status, args, 0) match {
       case Option4A(status) =>
         status.finish match {
           case Left(err) =>
             Option4B(err);
           case Right(cmds) =>
-            Option4A(cmds);
+            Option4A(cmds.toGlobalCommandGraph);
         }
       case Option4B(err) =>
         Option4B(err);
@@ -417,6 +418,17 @@ case class CommandNodeSeq (
   outputFileArgIdx: Int,
   commands: Vector[CommandNode],
 ) {
+
+  def toGlobalCommandGraph: CommandGraph = {
+    val  graph0 = CommandGraph.init;
+    val (graph1, inputEdgeId) = graph0.addEdge;
+    val  graph2 = graph1.addNode(FileInputCommandGraphNode(inputFormat, inputFile.getOrElse(""), inputEdgeId));
+    val (graph3, outputEdgeId) = graph2.addCommandSeq(commands, inputEdgeId);
+    val  graph4 = graph3.addNode(FileOutputCommandGraphNode(outputFile.getOrElse(""), outputEdgeId));
+    graph4;
+    // TODO inputType, outputType
+  }
+
 }
 
 object CommandNodeSeq {
@@ -560,13 +572,14 @@ trait CommandNode {
   // TSV形式でない場合はこの後ろに次のコマンドを配置することができない
   //def isOutputTsv: Boolean;
 
-  // CommandGraphにてノードとして扱うかどうか
-  //def isCommandGraphNode: Boolean;
+  // CommandGraphにて複雑なノードとして扱うかどうか
+  // diffなどはtrue
+  def isCommandGraphNode: Boolean;
 
   // CommandGraphにてノードとして扱う場合に前後のコマンド列を含めてエッジとして追加する
-  //def addNodeToGraph(graph: CommandGraph,
-  //  prevCommands: Vector[CommandSeqNode], nextCommands: Vector[CommandSeqNode],
-  //  inputEdgeId: Int, outputEdgeId: Int): CommandGraph;
+  def addNodeToGraph(graph: CommandGraph,
+    prevCommands: Vector[CommandNode], nextCommands: Vector[CommandNode],
+    inputEdgeId: Int): (CommandGraph, Int);
 
 }
 

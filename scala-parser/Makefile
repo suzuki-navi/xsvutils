@@ -1,7 +1,9 @@
 
-build: var/mulang/mulang
-	./var/mulang/mulang --devel
-	cp var/out.sh scala-parser
+build: scala-parser
+
+scala-parser: FORCE var/mulang/mulang
+	@ ./var/mulang/mulang --devel
+	@ if [ ! -e $@ ] || ! cmp -s var/out.sh $@; then cp var/out.sh $@; fi
 
 var/mulang/mulang:
 	mkdir -p var/mulang
@@ -13,4 +15,6 @@ var/mulang/mulang:
 #
 #var/class_file/Main.class: src/*.scala var/anylang.sh
 #	bash ./var/anylang.sh --jdk=11 --scala=2.13.0 scalac -deprecation -d var/class_file $<
+
+FORCE:
 

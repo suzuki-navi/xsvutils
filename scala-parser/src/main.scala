@@ -50,7 +50,7 @@ object Main {
     System.err.println(help); // TODO
   }
 
-  private def execCommands(commands: CommandNodeSeq): Unit = {
+  private def execCommands(commands: CommandGraph): Unit = {
     pprint.pprintln(commands); // TODO
   }
 

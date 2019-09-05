@@ -89,5 +89,13 @@ case class CutCommandNode (
   cols: List[String],
 ) extends CommandNode {
 
+  def isCommandGraphNode: Boolean = false;
+
+  def addNodeToGraph(graph: CommandGraph,
+    prevCommands: Vector[CommandNode], nextCommands: Vector[CommandNode],
+    inputEdgeId: Int): (CommandGraph, Int) = {
+    throw new AssertionError(); // ここにはこないはず
+  }
+
 }
 
