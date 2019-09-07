@@ -2,23 +2,33 @@ use strict;
 use warnings;
 use utf8;
 
+################################################################################
+
 # ファイルまたはパイプからの入力をそのまま標準出力するが、
 # ファイルの先頭部分だけteeコマンドのように別の出力先にも出力する。
+# 入力が圧縮されている場合は、どちらの出力先にも解凍後のデータを出力する。
+# 
 # 別の出力先は -h で指定する。
-# -f を指定すると、指定したファイルに入力ファイルのフォーマットに関する情報を出力する。
+# -h を指定すると、指定したファイルパスに入力ファイルの先頭部分を出力する。
+# 入力が圧縮されていた場合は解凍後のデータを出力する。
+# 
+# -f を指定すると、指定したファイルパスに入力ファイルのフォーマットに関する情報を出力する。
 # -f での出力例
-# gzip  gzでの圧縮(-t での出力は解凍後のファイルになる)
-# xz    xzでの圧縮(-t での出力は解凍後のファイルになる)
+# gz    gzipでの圧縮(-h での出力は解凍後のファイルになる)
+# xz    xzでの圧縮(-h での出力は解凍後のファイルになる)
 # file  fileモード(それ以外はpipeモード)
 # 
 # fileモードでは標準出力しない。
 # 
 # 例
 # 
-# $ perl format-compression.pl -t /dev/stderr -c 1024 < input.txt > output.txt
-# $ perl format-compression.pl -f flags.txt -h head.txt -c 1024 -i input.txt > output.txt
+# $ perl compression-wrapper.pl -f flags.txt             -c 1024  < input.txt > output.txt
+# $ perl compression-wrapper.pl -f flags.txt             -c 1024 -i input.txt > output.txt
+# $ perl compression-wrapper.pl -f flags.txt -h head.txt -c 1024 -i input.txt > output.txt
 # 
 # 外部コマンド gunzip, xz に依存する。
+
+################################################################################
 
 my $self_script = $0;
 
@@ -32,31 +42,30 @@ my $flag_append = '';
 my $head_path = undef;
 my $head_size = 4096;
 
-my $output_flag = 1;
-
 while (@ARGV) {
     my $a = shift(@ARGV);
     if ($a eq "--pipe") {
         # pipeモードに強制する
         $pipe_mode = 1;
     } elsif ($a eq "-i") {
+        # 入力ファイルを指定
         die "option $a needs an argument" unless (@ARGV);
         $input_path = shift(@ARGV);
     } elsif ($a eq "-h") {
+        # 先頭部分の出力先
         die "option $a needs an argument" unless (@ARGV);
         $head_path = shift(@ARGV);
     } elsif ($a eq "-c") {
+        # 先頭部分の出力サイズ
         die "option $a needs an argument" unless (@ARGV);
         $head_size = shift(@ARGV);
     } elsif ($a eq "-f") {
+        # フォーマットに関する情報の出力先
         die "option $a needs an argument" unless (@ARGV);
         $flag_path = shift(@ARGV);
     } elsif ($a eq "--flag-append") {
         # 内部から呼び出されるとき専用のオプション
         $flag_append = 1;
-    } elsif ($a eq "--no-output") {
-        # 内部から呼び出されるとき専用のオプション
-        $output_flag = '';
     } else {
         die "Unknown argument: $a";
     }
@@ -76,6 +85,90 @@ if (defined($input_path)) {
 if (defined($input_path)) {
     open(my $in, '<', $input_path) or die $!;
     open(STDIN, '<&=', fileno($in)) or die $!;
+}
+
+################################################################################
+
+sub detectFormat {
+    my ($head_buf) = @_;
+    my @result = ();
+
+    my $newline;
+    if ($head_buf =~ /\r\n/) {
+        $newline = 'dos';
+    } elsif ($head_buf =~ /\r/) {
+        $newline = 'mac';
+    } else {
+        $newline = 'unix';
+    }
+    push(@result, $newline);
+
+    my $head_buf2 = $head_buf;
+    if ($newline eq 'mac') {
+        $head_buf2 =~ s/\r/\n/g;
+    }
+
+    my $table_format;
+    if ($head_buf2 =~ /\A[^\n]*\t/) {
+        $table_format = 'tsv';
+    } elsif ($head_buf2 =~ /\A[^\n]*,/) {
+        $table_format = 'csv';
+    } else {
+        $table_format = 'tsv';
+    }
+    push(@result, $table_format);
+
+    # 文字コードを自動判別する。
+    # いまのところ、 UTF-8 / SHIFT-JIS のみ
+    my $charencoding;
+    my $utf8bom;
+    {
+        my $len = length($head_buf2);
+        my $utf8_multi = 0;
+        my $utf8_flag = 1;
+        my $sjis_multi = 0;
+        my $sjis_flag = 1;
+        for (my $i = 0; $i < $len; $i++) {
+            my $b = ord(substr($head_buf2, $i, 1));
+            if ($utf8_multi > 0) {
+                if    ($b >= 0x80 && $b < 0xC0)  { $utf8_multi--; }
+                else                             { $utf8_multi = 0; $utf8_flag = ''; }
+            } else {
+                if    ($b < 0x80)                { ; }
+                elsif ($b >= 0xC2 && $b < 0xE0)  { $utf8_multi = 1; }
+                elsif ($b >= 0xE0 && $b < 0xF0)  { $utf8_multi = 2; }
+                elsif ($b >= 0xF0 && $b < 0xF8)  { $utf8_multi = 3; }
+                else                             { $utf8_flag = ''; }
+            }
+            if ($sjis_multi > 0) {
+                if    ($b >= 0x40 && $b <= 0x7E) { $sjis_multi = 0; }
+                elsif ($b >= 0x80 && $b <= 0xFC) { $sjis_multi = 0; }
+                else                             { $sjis_multi = 0; $sjis_flag = ''; }
+            } else {
+                if    ($b <= 0x7F)               { ; }
+                elsif ($b >= 0x81 && $b <= 0x9F) { $sjis_multi = 1; }
+                elsif ($b >= 0xA0 && $b <= 0xDF) { ; }
+                elsif ($b >= 0xE0 && $b <= 0xFC) { $sjis_multi = 1; }
+                elsif ($b >= 0xFD && $b <= 0xFF) { ; }
+                else                             { $sjis_flag = ''; }
+            }
+        }
+        $charencoding = "utf8";
+        $utf8bom = '';
+        if (!$utf8_flag && $sjis_flag) {
+            $charencoding = "sjis";
+        } else {
+            if ($len >= 3) {
+                if (substr($head_buf2, 0, 3) eq "\xEF\xBB\xBF") {
+                    # BOM in UTF-8
+                    # require `tail -c+4`
+                    $charencoding = 'utf8-bom';
+                }
+            }
+        }
+    }
+    push(@result, $charencoding);
+    \@result;
 }
 
 ################################################################################
@@ -112,7 +205,7 @@ sub cat {
 # proc3の標準入力に接続し、
 # proc3の標準出力を現在のプロセスの出力とする。
 sub fork_processes {
-    my ($head_buf, $output_flag, $proc2, $proc3) = @_;
+    my ($head_buf, $proc2, $proc3) = @_;
 
     my $PROCESS2_READER;
     my $PROCESS1_WRITER;
@@ -126,9 +219,8 @@ sub fork_processes {
         close($PROCESS2_READER);
         open(STDOUT, '>&=', fileno($PROCESS1_WRITER)) or die $!;
 
-        # 読み込み済みの入力を標準出力する
-        # 残りは無視する
-        syswrite(STDOUT, $head_buf);
+        # 読み込み済みの入力を標準出力し、残りはcatする
+        cat($head_buf);
         exit(0);
     }
     close($PROCESS1_WRITER);
@@ -174,26 +266,12 @@ sub fork_processes {
     }
     # $proc2 のエラーは無視する
 
-    if ($result_code != 0) {
-        exit($result_code);
-    } else {
-        if ($output_flag) {
-            cat($head_buf);
-        }
-        exit(0);
-    }
+    exit($result_code);
 }
 
 ################################################################################
 # 先頭部分を読み込む
 ################################################################################
-
-if ($pipe_mode) {
-    write_flag();
-} else {
-    write_flag("file");
-    $output_flag = '';
-}
 
 my $head_buf = "";
 my $read_size = 0;
@@ -235,7 +313,7 @@ if ($gzip_flag || $xz_flag) {
     if ($xz_flag) {
         write_flag("xz");
     } else {
-        write_flag("gzip");
+        write_flag("gz");
     }
 
     my $proc2 = sub {
@@ -254,23 +332,34 @@ if ($gzip_flag || $xz_flag) {
         if (defined($flag_path)) {
             push(@options, "-f", $flag_path, "--flag-append");
         }
-        push(@options, "--no-output");
         exec("perl", $self_script, @options);
     };
-    fork_processes($head_buf, $output_flag, $proc2, $proc3);
+    fork_processes($head_buf, $proc2, $proc3);
+    exit(0);
+}
+
+# 非圧縮ファイルの場合の処理
+
+if ($pipe_mode) {
+    write_flag("pipe");
 } else {
-    # 非圧縮ファイルの場合の処理
+    write_flag("file");
+}
 
-    if (defined($head_path)) {
-        open(my $head_fh, '>', $head_path) or die $!;
-        syswrite($head_fh, $head_buf);
-        close($head_path);
-    }
+if (defined($head_path)) {
+    open(my $head_fh, '>', $head_path) or die $!;
+    syswrite($head_fh, $head_buf);
+    close($head_path);
+}
 
-    if ($output_flag) {
-        # 読み込み済みの入力を標準出力し、残りはcatする
-        cat($head_buf);
-    }
+my $formatFlags = detectFormat($head_buf);
+for my $f (@$formatFlags) {
+    write_flag($f);
+}
+
+# 読み込み済みの入力を標準出力し、残りはcatする
+if ($pipe_mode) {
+    cat($head_buf);
 }
 
 ################################################################################
