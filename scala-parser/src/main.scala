@@ -52,6 +52,9 @@ object Main {
 
   private def execCommands(commands: CommandGraph): Unit = {
     pprint.pprintln(commands); // TODO
+    FormatReader.read(commands.fileInputList).foreach { r =>
+      pprint.pprintln(r);
+    }
   }
 
 }

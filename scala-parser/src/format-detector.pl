@@ -41,6 +41,8 @@ my $flag_path = undef;
 my $flag_append = '';
 my $head_path = undef;
 my $head_size = 4096;
+my $ping_path = undef;
+my $output_path = undef;
 
 while (@ARGV) {
     my $a = shift(@ARGV);
@@ -66,6 +68,14 @@ while (@ARGV) {
     } elsif ($a eq "--flag-append") {
         # 内部から呼び出されるとき専用のオプション
         $flag_append = 1;
+    } elsif ($a eq "-p") {
+        # 
+        die "option $a needs an argument" unless (@ARGV);
+        $ping_path = shift(@ARGV);
+    } elsif ($a eq "-o") {
+        # 
+        die "option $a needs an argument" unless (@ARGV);
+        $output_path = shift(@ARGV);
     } else {
         die "Unknown argument: $a";
     }
@@ -332,6 +342,12 @@ if ($gzip_flag || $xz_flag) {
         if (defined($flag_path)) {
             push(@options, "-f", $flag_path, "--flag-append");
         }
+        if (defined($ping_path)) {
+            push(@options, "-p", $ping_path);
+        }
+        if (defined($output_path)) {
+            push(@options, "-o", $output_path);
+        }
         exec("perl", $self_script, @options);
     };
     fork_processes($head_buf, $proc2, $proc3);
@@ -355,6 +371,17 @@ if (defined($head_path)) {
 my $formatFlags = detectFormat($head_buf);
 for my $f (@$formatFlags) {
     write_flag($f);
+}
+
+if (defined($ping_path)) {
+    # -f で指定したファイルへの出力が完了したことの通知
+    open(my $ping_fh, '>', $ping_path) or die $!;
+    close($ping_fh);
+}
+
+if (defined($output_path)) {
+    open(my $out, '>', $output_path) or die $!;
+    open(STDOUT, '>&=', fileno($out)) or die $!;
 }
 
 # 読み込み済みの入力を標準出力し、残りはcatする

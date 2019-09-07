@@ -101,7 +101,7 @@ trait OptionParserContext {
 case class CommandSeqParserStatus (
   inputType: CommandSeqInputType,
   outputType: CommandSeqOutputType,
-  inputFormat: Option[InputFormat],
+  inputFormat: Option[InputTableFormat],
   inputFile: Option[String], // 空文字列は標準入力の意味
   outputFile: Option[String],
   inputFileArgIdx: Int,
@@ -256,7 +256,7 @@ case class CommandSeqParserStatus (
         case Some(_) =>
           (Option3B(ParserErrorMessage(argIdx, "duplicated option")), None);
         case None =>
-          (Option3A(this.copy(inputFormat = Some(TsvInputFormat))),
+          (Option3A(this.copy(inputFormat = Some(TsvInputTableFormat))),
             Some((tail, argIdx + 1)));
       }
     } else if (opt == "--csv") {
@@ -264,7 +264,7 @@ case class CommandSeqParserStatus (
         case Some(_) =>
           (Option3B(ParserErrorMessage(argIdx, "duplicated option")), None);
         case None =>
-          (Option3A(this.copy(inputFormat = Some(CsvInputFormat))),
+          (Option3A(this.copy(inputFormat = Some(CsvInputTableFormat))),
             Some((tail, argIdx + 1)));
       }
     } else if (opt == "-") {
@@ -411,7 +411,7 @@ case class ParserException(msg: ParserErrorMessage) extends Exception(msg.toStri
 case class CommandNodeSeq (
   inputType: CommandSeqInputType,
   outputType: CommandSeqOutputType,
-  inputFormat: Option[InputFormat],
+  inputFormat: Option[InputTableFormat],
   inputFile: Option[String], // 空文字列は標準入力の意味
   outputFile: Option[String],
   inputFileArgIdx: Int,
@@ -421,11 +421,10 @@ case class CommandNodeSeq (
 
   def toGlobalCommandGraph: CommandGraph = {
     val  graph0 = CommandGraph.init;
-    val (graph1, inputEdgeId) = graph0.addEdge;
-    val  graph2 = graph1.addNode(FileInputCommandGraphNode(inputFormat, inputFile.getOrElse(""), inputEdgeId));
-    val (graph3, outputEdgeId) = graph2.addCommandSeq(commands, inputEdgeId);
-    val  graph4 = graph3.addNode(FileOutputCommandGraphNode(outputFile.getOrElse(""), outputEdgeId));
-    graph4;
+    val (graph1, inputEdgeId) = graph0.addFileInput(inputFormat, inputFile.getOrElse(""));
+    val (graph2, outputEdgeId) = graph1.addCommandSeq(commands, inputEdgeId);
+    val  graph3 = graph2.addFileOutput(outputFile.getOrElse(""), outputEdgeId);
+    graph3;
     // TODO inputType, outputType
   }
 
@@ -448,9 +447,9 @@ object CommandNodeSeq {
 
 }
 
-sealed trait InputFormat { def name: String }
-case object TsvInputFormat extends InputFormat { def name = "tsv" }
-case object CsvInputFormat extends InputFormat { def name = "csv" }
+sealed trait InputTableFormat { def name: String }
+case object TsvInputTableFormat extends InputTableFormat { def name = "tsv" }
+case object CsvInputTableFormat extends InputTableFormat { def name = "csv" }
 
 // CommandSeqInputType, CommandSeqOutputType について
 //   サブコマンドごとの例

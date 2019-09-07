@@ -34,6 +34,26 @@ case class CommandGraph (
     }
   }
 
+  def addFileInput(inputFormat: Option[InputTableFormat], inputFile: String): (CommandGraph, Int) = {
+    val  graph0 = this;
+    val (graph1, edgeId) = graph0.addEdge;
+    val  graph2 = graph1.addNode(CommandGraph.FileInputCommandGraphNode(inputFormat, inputFile, edgeId));
+    (graph2, edgeId);
+  }
+
+  def addFileOutput(outputFile: String, edgeId: Int): CommandGraph = {
+    val  graph0 = this;
+    val  graph1 = graph0.addNode(CommandGraph.FileOutputCommandGraphNode(outputFile, edgeId));
+    graph1;
+  }
+
+  def fileInputList: Vector[CommandGraph.FileInputCommandGraphNode] = {
+    nodes.flatMap {
+      case cmd: CommandGraph.FileInputCommandGraphNode => cmd :: Nil;
+      case _ => Nil;
+    }
+  }
+
 }
 
 object CommandGraph {
@@ -50,6 +70,23 @@ object CommandGraph {
     def outputs: List[Int] = outputEdgeId :: Nil;
   }
 
+  case class FileInputCommandGraphNode private (
+    format: Option[InputTableFormat],
+    path: String, // 空文字列は標準入力の意味
+    edgeId: Int,
+  ) extends CommandGraphNode {
+    def inputs:  List[Int] = Nil;
+    def outputs: List[Int] = edgeId :: Nil;
+  }
+
+  case class FileOutputCommandGraphNode private (
+    path: String, // 空文字列は標準出力の意味
+    edgeId: Int,
+  ) extends CommandGraphNode {
+    def inputs:  List[Int] = edgeId :: Nil;
+    def outputs: List[Int] = Nil;
+  }
+
 }
 
 // 頂点(ノード) = 複雑なコマンド(diff等)や入出力
@@ -57,23 +94,6 @@ object CommandGraph {
 trait CommandGraphNode {
   def inputs:  List[Int]; // コマンドにとっての入力
   def outputs: List[Int]; // コマンドにとっての出力
-}
-
-case class FileInputCommandGraphNode (
-  inputFormat: Option[InputFormat],
-  inputFile: String, // 空文字列は標準入力の意味
-  edgeId: Int,
-) extends CommandGraphNode {
-  def inputs:  List[Int] = Nil;
-  def outputs: List[Int] = edgeId :: Nil;
-}
-
-case class FileOutputCommandGraphNode (
-  outputFile: String, // 空文字列は標準出力の意味
-  edgeId: Int,
-) extends CommandGraphNode {
-  def inputs:  List[Int] = edgeId :: Nil;
-  def outputs: List[Int] = Nil;
 }
 
 

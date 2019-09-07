@@ -191,12 +191,11 @@ case class DiffCommandNode (
       case Some(inputFile) =>
         val  graph0 = graph;
         val (graph1, input1Edge1)  = graph0.addCommandSeq(prevCommands ++ tail, inputEdgeId);
-        val (graph2, input2Edge1)  = graph1.addEdge;
-        val  graph3                = graph2.addNode(FileInputCommandGraphNode(other.inputFormat, inputFile, input2Edge1));
-        val (graph4, input2Edge2)  = graph3.addCommandSeq(other.commands ++ tail, input2Edge1);
-        val (graph5, outputEdgeId) = graph4.addEdge;
-        val  graph6                = graph5.addNode(DiffCommandGraphNode(input1Edge1, input2Edge2, outputEdgeId));
-        (graph6, outputEdgeId);
+        val (graph2, input2Edge1)  = graph1.addFileInput(other.inputFormat, inputFile);
+        val (graph3, input2Edge2)  = graph2.addCommandSeq(other.commands ++ tail, input2Edge1);
+        val (graph4, outputEdgeId) = graph3.addEdge;
+        val  graph5                = graph4.addNode(DiffCommandGraphNode(input1Edge1, input2Edge2, outputEdgeId));
+        (graph5, outputEdgeId);
     }
   }
 
