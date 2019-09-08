@@ -3,7 +3,7 @@
 object OptionParser {
 
   def parseCommands(args: List[String], ctxt: OptionParserContext):
-    Either3[CommandGraph, ParserErrorMessage, HelpDocument] = {
+    Either3[IndexedSeq[Graph.Node[CommandNode]], ParserErrorMessage, HelpDocument] = {
     parse(args, false, ctxt) match {
       case Option4A(commands) => Option3A(commands);
       case Option4B(err) =>      Option3B(err);
@@ -22,7 +22,7 @@ object OptionParser {
   }
 
   private[this] def parse(args: List[String], isCompletion: Boolean, ctxt: OptionParserContext):
-    Either4[CommandGraph, ParserErrorMessage, HelpDocument, Completion] = {
+    Either4[IndexedSeq[Graph.Node[CommandNode]], ParserErrorMessage, HelpDocument, Completion] = {
 
     @scala.annotation.tailrec
     def sub(status: CommandSeqParserStatus, args: List[String], argIdx: Int):
@@ -106,7 +106,7 @@ case class CommandSeqParserStatus (
   outputFile: Option[String],
   inputFileArgIdx: Int,
   outputFileArgIdx: Int,
-  commands: Vector[CommandNode],
+  commands: Vector[CommandPipeNode],
   lastCommand: CommandParserStatus,
 ) {
 
@@ -416,16 +416,14 @@ case class CommandNodeSeq (
   outputFile: Option[String],
   inputFileArgIdx: Int,
   outputFileArgIdx: Int,
-  commands: Vector[CommandNode],
+  commands: Vector[CommandPipeNode],
 ) {
 
-  def toGlobalCommandGraph: CommandGraph = {
-    val  graph0 = CommandGraph.init;
-    val (graph1, inputEdgeId) = graph0.addFileInput(inputFormat, inputFile.getOrElse(""));
-    val (graph2, outputEdgeId) = graph1.addCommandSeq(commands, inputEdgeId);
-    val  graph3 = graph2.addFileOutput(outputFile.getOrElse(""), outputEdgeId);
-    graph3;
-    // TODO inputType, outputType
+  def toGlobalCommandGraph: IndexedSeq[Graph.Node[CommandNode]] = {
+    val outputEdge = CommandGraph.unshift(FileOutputCommandNode(outputFile.getOrElse("")));
+    val (inputEdge, nodes) = CommandGraph.unshiftCommands(commands, outputEdge);
+    CommandGraph.unshift(FileInputCommandNode(inputFormat, inputFile.getOrElse("")), inputEdge) +:
+      nodes;
   }
 
 }
@@ -517,7 +515,7 @@ trait CommandParserStatus {
 
   def childOrTailParser: Option[ChildOrTailCommandSeqParser];
 
-  def finish: Either[ParserErrorMessage, CommandNode];
+  def finish: Either[ParserErrorMessage, CommandPipeNode];
 
   def completion: Completion;
 
@@ -559,26 +557,23 @@ case object NoneCommandParserStatus extends CommandParserStatus {
     None;
   }
 
-  def finish: Either[ParserErrorMessage, CommandNode] = throw new AssertionError();
+  def finish: Either[ParserErrorMessage, CommandPipeNode] = throw new AssertionError();
 
   def completion: Completion = throw new AssertionError();
 
 }
 
 trait CommandNode {
+}
+
+trait CommandPipeNode extends CommandNode {
 
   // 出力がTSV形式かどうか
   // TSV形式でない場合はこの後ろに次のコマンドを配置することができない
   //def isOutputTsv: Boolean;
 
-  // CommandGraphにて複雑なノードとして扱うかどうか
-  // diffなどはtrue
-  def isCommandGraphNode: Boolean;
-
-  // CommandGraphにてノードとして扱う場合に前後のコマンド列を含めてエッジとして追加する
-  def addNodeToGraph(graph: CommandGraph,
-    prevCommands: Vector[CommandNode], nextCommands: Vector[CommandNode],
-    inputEdgeId: Int): (CommandGraph, Int);
+  def addNodeToGraph(output: Graph.Edge[CommandNode]):
+    (Graph.Edge[CommandNode], IndexedSeq[Graph.Node[CommandNode]]);
 
 }
 

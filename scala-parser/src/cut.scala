@@ -49,7 +49,7 @@ case class CutCommandParserStatus (
 
   def childOrTailParser: Option[ChildOrTailCommandSeqParser] = None;
 
-  def finish: Either[ParserErrorMessage, CommandNode] = {
+  def finish: Either[ParserErrorMessage, CommandPipeNode] = {
     cols match {
       case None =>
         Left(ParserErrorMessage(argIdx, "option `--cols` expected"));
@@ -87,14 +87,11 @@ case class CutCommandParserStatus (
 
 case class CutCommandNode (
   cols: List[String],
-) extends CommandNode {
+) extends CommandPipeNode {
 
-  def isCommandGraphNode: Boolean = false;
-
-  def addNodeToGraph(graph: CommandGraph,
-    prevCommands: Vector[CommandNode], nextCommands: Vector[CommandNode],
-    inputEdgeId: Int): (CommandGraph, Int) = {
-    throw new AssertionError(); // ここにはこないはず
+  def addNodeToGraph(output: Graph.Edge[CommandNode]):
+    (Graph.Edge[CommandNode], IndexedSeq[Graph.Node[CommandNode]]) = {
+    (Graph.unshiftEdges(this, Vector(output), 1)(0), Vector.empty);
   }
 
 }

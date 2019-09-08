@@ -9,19 +9,7 @@ import scala.concurrent.duration.MILLISECONDS;
 
 object FormatReader {
 
-  import CommandGraph.FileInputCommandGraphNode;
-
   implicit val ec = ProcessUtil.executorContext;
-
-  def read(files: Vector[FileInputCommandGraphNode]): Vector[Result] = {
-    val futureList = files.zipWithIndex.map { case (file, index) =>
-      formatReaderFuture(file, index + 1);
-    }
-    val results = futureList.map { f =>
-      Await.result(f, Duration.Inf);
-    }
-    results;
-  }
 
   case class Result (
     path: String,
@@ -41,8 +29,8 @@ object FormatReader {
   }
   private val working_dir: String = "./tmp"; // TODO
 
-  private def formatReaderFuture(file: FileInputCommandGraphNode, id: Int): Future[Result] = {
-    val path = file.path;
+  def read(file: FileInputCommandNode, id: Int): Future[Result] = {
+    val path = file.path; // TODO 空文字列の場合
     Future[Result] {
 
       val pingPath = working_dir + "/input-" + id + "-ping.fifo";
@@ -88,7 +76,7 @@ object FormatReader {
   }
 
   private def newResult(lines: List[String],
-    file: FileInputCommandGraphNode, pipePath: String): Result = {
+    file: FileInputCommandNode, pipePath: String): Result = {
     val path = if (lines.contains("pipe")) {
       pipePath;
     } else {

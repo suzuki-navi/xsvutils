@@ -50,11 +50,8 @@ object Main {
     System.err.println(help); // TODO
   }
 
-  private def execCommands(commands: CommandGraph): Unit = {
+  private def execCommands(commands: IndexedSeq[Graph.Node[CommandNode]]): Unit = {
     pprint.pprintln(commands); // TODO
-    FormatReader.read(commands.fileInputList).foreach { r =>
-      pprint.pprintln(r);
-    }
   }
 
 }

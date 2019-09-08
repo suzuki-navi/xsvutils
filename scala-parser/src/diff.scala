@@ -105,7 +105,7 @@ case class DiffCommandParserStatus (
     }
   }
 
-  def finish: Either[ParserErrorMessage, CommandNode] = {
+  def finish: Either[ParserErrorMessage, CommandPipeNode] = {
     try {
       val newOther: CommandNodeSeq = other match {
         case None =>
@@ -120,7 +120,7 @@ case class DiffCommandParserStatus (
         case Some(Right(cmds)) =>
           cmds;
       }
-      val newTail: Vector[CommandNode] = tail match {
+      val newTail: Vector[CommandPipeNode] = tail match {
         case None =>
           Vector.empty;
         case Some(Left(status)) =>
@@ -167,46 +167,29 @@ case class DiffCommandParserStatus (
 
 case class DiffCommandNode (
   other: CommandNodeSeq,
-  tail: Vector[CommandNode],
-) extends CommandNode {
+  tail: Vector[CommandPipeNode],
+) extends CommandPipeNode {
 
   def isCommandGraphNode: Boolean = true;
 
-  def addNodeToGraph(graph: CommandGraph,
-    prevCommands: Vector[CommandNode], nextCommands: Vector[CommandNode],
-    inputEdgeId: Int): (CommandGraph, Int) = {
-    assert(nextCommands.isEmpty);
+  def addNodeToGraph(output: Graph.Edge[CommandNode]):
+    (Graph.Edge[CommandNode], IndexedSeq[Graph.Node[CommandNode]]) = {
     other.inputFile match {
       case None =>
-        val  graph0 = graph;
-        val (graph1, input1Edge1)  = graph0.addCommandSeq(prevCommands, inputEdgeId);
-        val (graph2, input1Edge2)  = graph1.addEdge;
-        val (graph3, input2Edge1)  = graph2.addEdge;
-        val  graph4                = graph3.addNode(TeeCommandGraphNode(input1Edge1, input1Edge2, input2Edge1));
-        val (graph5, input1Edge3)  = graph4.addCommandSeq(nextCommands, input1Edge2);
-        val (graph6, input2Edge2)  = graph5.addCommandSeq(nextCommands, input2Edge1);
-        val (graph7, outputEdgeId) = graph6.addEdge;
-        val  graph8                = graph7.addNode(DiffCommandGraphNode(input1Edge3, input2Edge2, outputEdgeId));
-        (graph8, outputEdgeId);
+        val inputEdges = Graph.unshiftEdges(this, Vector(output), 2);
+        val (input1Edge, nodes1) = CommandGraph.unshiftCommands(tail, inputEdges(0));
+        val (input2Edge, nodes2) = CommandGraph.unshiftCommands(other.commands ++ tail, inputEdges(1));
+        val teeInputEdge = Graph.unshiftEdges(TeeCommandNode(2), Vector(input1Edge, input2Edge), 1)(0);
+        (teeInputEdge, nodes1 ++ nodes2);
+    throw new AssertionError("作りかけ");
       case Some(inputFile) =>
-        val  graph0 = graph;
-        val (graph1, input1Edge1)  = graph0.addCommandSeq(prevCommands ++ tail, inputEdgeId);
-        val (graph2, input2Edge1)  = graph1.addFileInput(other.inputFormat, inputFile);
-        val (graph3, input2Edge2)  = graph2.addCommandSeq(other.commands ++ tail, input2Edge1);
-        val (graph4, outputEdgeId) = graph3.addEdge;
-        val  graph5                = graph4.addNode(DiffCommandGraphNode(input1Edge1, input2Edge2, outputEdgeId));
-        (graph5, outputEdgeId);
+        val inputEdges = Graph.unshiftEdges(this, Vector(output), 2);
+        val (input1Edge, nodes1) = CommandGraph.unshiftCommands(tail, inputEdges(0));
+        val (input2Edge, nodes2) = CommandGraph.unshiftCommands(other.commands ++ tail, inputEdges(1));
+        val otherInputNode = CommandGraph.unshift(FileInputCommandNode(other.inputFormat, inputFile), input2Edge);
+        (input1Edge, (nodes1 :+ otherInputNode) ++ nodes2);
     }
   }
 
-}
-
-case class DiffCommandGraphNode(
-  input1: Int,
-  input2: Int,
-  output: Int,
-) extends CommandGraphNode {
-  def inputs:  List[Int] = input1 :: input2 :: Nil;
-  def outputs: List[Int] = output :: Nil;
 }
 
