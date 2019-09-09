@@ -5,19 +5,51 @@ import scala.concurrent.Await;
 import scala.concurrent.Future;
 import scala.concurrent.Promise;
 import scala.concurrent.duration.Duration;
-import scala.concurrent.duration.MILLISECONDS;
+
+sealed trait CompressionType { def name: String }
+object CompressionType {
+  case object Gz extends CompressionType { def name = "gz" }
+  case object Xz extends CompressionType { def name = "xz" }
+}
+
+sealed trait InputTableFormat { def name: String }
+object InputTableFormat {
+  case object Tsv extends InputTableFormat { def name = "tsv" }
+  case object Csv extends InputTableFormat { def name = "csv" }
+}
+
+sealed trait NewlineType { def name: String }
+object NewlineType {
+  case object Unix extends NewlineType { def name = "unix" }
+  case object Dos extends NewlineType { def name = "dos" }
+  case object Mac extends NewlineType { def name = "mac" }
+}
+
+sealed trait Charencoding { def name: String }
+object Charencoding {
+  case object Utf8 extends Charencoding { def name = "utf8" }
+  case object Utf8bom extends Charencoding { def name = "utf8-bom" }
+  case object Sjis extends Charencoding { def name = "sjis" }
+}
 
 object FormatReader {
 
   implicit val ec = ProcessUtil.executorContext;
 
   case class Result (
-    path: String,
-    compressionType: List[String], // "gz", "xz"
-    newlineType: String,  // "unix", "dos", "mac"
-    tableType: InputTableFormat,    // tsv, csv
-    charencoding: String, // "utf8", "utf8-bom", "sjis"
-  );
+    origPath: String,
+    pipePath: Option[String],
+    flagPath: String,
+    compressionType: List[CompressionType], // "gz", "xz"
+    newlineType: NewlineType,  // "unix", "dos", "mac"
+    tableFormat: InputTableFormat,    // tsv, csv
+    charencoding: Charencoding, // "utf8", "utf8-bom", "sjis"
+  ) {
+    def path: String = pipePath match {
+      case Some(p) => p;
+      case None => origPath;
+    }
+  }
 
   private val mulang_source_dir: String = {
     val d = System.getenv("MULANG_SOURCE_DIR");
@@ -29,7 +61,7 @@ object FormatReader {
   }
   private val working_dir: String = "./tmp"; // TODO
 
-  def read(file: FileInputCommandNode, id: Int): Future[Result] = {
+  def read(file: FileInputCommandGraphNode, id: Int): Future[Result] = {
     val path = file.path; // TODO 空文字列の場合
     Future[Result] {
 
@@ -71,46 +103,48 @@ object FormatReader {
         fp.close();
       }
 
-      newResult(lines, file, pipePath);
+      newResult(lines, file, pipePath, flagPath);
     }
   }
 
   private def newResult(lines: List[String],
-    file: FileInputCommandNode, pipePath: String): Result = {
-    val path = if (lines.contains("pipe")) {
-      pipePath;
+    file: FileInputCommandGraphNode, pipePath: String, flagPath: String): Result = {
+    val pipePathOpt = if (lines.contains("pipe")) {
+      Some(pipePath);
     } else {
-      file.path;
+      None;
     }
     val compressionType = lines.flatMap {
-      case "gz" => "gz" :: Nil;
-      case "xz" => "xz" :: Nil;
+      case "gz" => CompressionType.Gz :: Nil;
+      case "xz" => CompressionType.Xz :: Nil;
       case _ => Nil;
     }
     val newlineType = if (lines.contains("dos")) {
-      "dos";
+      NewlineType.Dos;
     } else if (lines.contains("mac")) {
-      "mac";
+      NewlineType.Mac;
     } else {
-      "unix";
+      NewlineType.Unix;
     }
-    val tableType = file.format match {
-      case Some(f) => f;
+    val tableFormat: InputTableFormat = file.tableFormat match {
+      case Some(f) =>
+        f;
       case None =>
         if (lines.contains("csv")) {
-          CsvInputTableFormat;
+          InputTableFormat.Csv;
         } else {
-          TsvInputTableFormat;
+          InputTableFormat.Tsv;
         }
     }
     val charencoding = if (lines.contains("utf8-bom")) {
-      "utf8-bom";
+      Charencoding.Utf8bom;
     } else if (lines.contains("sjis")) {
-      "sjis";
+      Charencoding.Sjis;
     } else {
-      "utf8";
+      Charencoding.Utf8;
     }
-    Result(path, compressionType, newlineType, tableType, charencoding);
+    Result(file.path, pipePathOpt, flagPath,
+      compressionType, newlineType, tableFormat, charencoding);
   }
 
 }

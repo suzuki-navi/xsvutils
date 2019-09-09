@@ -87,12 +87,16 @@ case class CutCommandParserStatus (
 
 case class CutCommandNode (
   cols: List[String],
-) extends CommandPipeNode {
+) extends CommandPipeNode with CommandGraphNode {
 
-  def addNodeToGraph(output: Graph.Edge[CommandNode]):
-    (Graph.Edge[CommandNode], IndexedSeq[Graph.Node[CommandNode]]) = {
+  def addNodeToGraph(output: Graph.Edge[CommandGraphNode]):
+    (Graph.Edge[CommandGraphNode], IndexedSeq[Graph.Node[CommandGraphNode]]) = {
     (Graph.unshiftEdges(this, Vector(output), 1)(0), Vector.empty);
   }
+
+  def toProcessNode(node: Graph.Node[CommandGraphNode],
+    newNexts: IndexedSeq[Graph.Edge[CommandGraphNode]]): Graph.Node[CommandGraphNode] =
+    toProcessNodeDefault(node, newNexts);
 
 }
 

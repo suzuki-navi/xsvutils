@@ -32,6 +32,7 @@ object Main {
       case cmd :: _ =>
         throw new Exception("command not found: " + cmd);
     }
+    System.exit(0);
   }
 
   private def parserContext() = new OptionParserContext {
@@ -50,8 +51,9 @@ object Main {
     System.err.println(help); // TODO
   }
 
-  private def execCommands(commands: IndexedSeq[Graph.Node[CommandNode]]): Unit = {
-    pprint.pprintln(commands); // TODO
+  private def execCommands(commands: IndexedSeq[Graph.Node[CommandGraphNode]]): Unit = {
+    ProcessSeqBuilder.build(commands);
+    //pprint.pprintln(commands); // TODO
   }
 
 }

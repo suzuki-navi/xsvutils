@@ -3,7 +3,7 @@
 object OptionParser {
 
   def parseCommands(args: List[String], ctxt: OptionParserContext):
-    Either3[IndexedSeq[Graph.Node[CommandNode]], ParserErrorMessage, HelpDocument] = {
+    Either3[IndexedSeq[Graph.Node[CommandGraphNode]], ParserErrorMessage, HelpDocument] = {
     parse(args, false, ctxt) match {
       case Option4A(commands) => Option3A(commands);
       case Option4B(err) =>      Option3B(err);
@@ -22,7 +22,7 @@ object OptionParser {
   }
 
   private[this] def parse(args: List[String], isCompletion: Boolean, ctxt: OptionParserContext):
-    Either4[IndexedSeq[Graph.Node[CommandNode]], ParserErrorMessage, HelpDocument, Completion] = {
+    Either4[IndexedSeq[Graph.Node[CommandGraphNode]], ParserErrorMessage, HelpDocument, Completion] = {
 
     @scala.annotation.tailrec
     def sub(status: CommandSeqParserStatus, args: List[String], argIdx: Int):
@@ -256,7 +256,7 @@ case class CommandSeqParserStatus (
         case Some(_) =>
           (Option3B(ParserErrorMessage(argIdx, "duplicated option")), None);
         case None =>
-          (Option3A(this.copy(inputFormat = Some(TsvInputTableFormat))),
+          (Option3A(this.copy(inputFormat = Some(InputTableFormat.Tsv))),
             Some((tail, argIdx + 1)));
       }
     } else if (opt == "--csv") {
@@ -264,7 +264,7 @@ case class CommandSeqParserStatus (
         case Some(_) =>
           (Option3B(ParserErrorMessage(argIdx, "duplicated option")), None);
         case None =>
-          (Option3A(this.copy(inputFormat = Some(CsvInputTableFormat))),
+          (Option3A(this.copy(inputFormat = Some(InputTableFormat.Csv))),
             Some((tail, argIdx + 1)));
       }
     } else if (opt == "-") {
@@ -419,10 +419,10 @@ case class CommandNodeSeq (
   commands: Vector[CommandPipeNode],
 ) {
 
-  def toGlobalCommandGraph: IndexedSeq[Graph.Node[CommandNode]] = {
-    val outputEdge = CommandGraph.unshift(FileOutputCommandNode(outputFile.getOrElse("")));
+  def toGlobalCommandGraph: IndexedSeq[Graph.Node[CommandGraphNode]] = {
+    val outputEdge = CommandGraph.unshift(FileOutputCommandGraphNode(outputFile.getOrElse("")));
     val (inputEdge, nodes) = CommandGraph.unshiftCommands(commands, outputEdge);
-    CommandGraph.unshift(FileInputCommandNode(inputFormat, inputFile.getOrElse("")), inputEdge) +:
+    CommandGraph.unshift(FileInputCommandGraphNode(inputFormat, inputFile.getOrElse("")), inputEdge) +:
       nodes;
   }
 
@@ -444,10 +444,6 @@ object CommandNodeSeq {
   }
 
 }
-
-sealed trait InputTableFormat { def name: String }
-case object TsvInputTableFormat extends InputTableFormat { def name = "tsv" }
-case object CsvInputTableFormat extends InputTableFormat { def name = "csv" }
 
 // CommandSeqInputType, CommandSeqOutputType について
 //   サブコマンドごとの例
@@ -563,17 +559,14 @@ case object NoneCommandParserStatus extends CommandParserStatus {
 
 }
 
-trait CommandNode {
-}
-
-trait CommandPipeNode extends CommandNode {
+trait CommandPipeNode {
 
   // 出力がTSV形式かどうか
   // TSV形式でない場合はこの後ろに次のコマンドを配置することができない
   //def isOutputTsv: Boolean;
 
-  def addNodeToGraph(output: Graph.Edge[CommandNode]):
-    (Graph.Edge[CommandNode], IndexedSeq[Graph.Node[CommandNode]]);
+  def addNodeToGraph(output: Graph.Edge[CommandGraphNode]):
+    (Graph.Edge[CommandGraphNode], IndexedSeq[Graph.Node[CommandGraphNode]]);
 
 }
 

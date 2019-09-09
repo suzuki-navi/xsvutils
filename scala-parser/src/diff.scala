@@ -133,7 +133,7 @@ case class DiffCommandParserStatus (
         case Some(Right(cmds)) =>
           cmds.commands;
       }
-      Right(DiffCommandNode(newOther, newTail));
+      Right(DiffCommandPipeNode(newOther, newTail));
     } catch {
       case ParserException(msg) =>
         Left(msg);
@@ -165,31 +165,39 @@ case class DiffCommandParserStatus (
 
 }
 
-case class DiffCommandNode (
+case class DiffCommandPipeNode (
   other: CommandNodeSeq,
   tail: Vector[CommandPipeNode],
 ) extends CommandPipeNode {
 
   def isCommandGraphNode: Boolean = true;
 
-  def addNodeToGraph(output: Graph.Edge[CommandNode]):
-    (Graph.Edge[CommandNode], IndexedSeq[Graph.Node[CommandNode]]) = {
+  def addNodeToGraph(output: Graph.Edge[CommandGraphNode]):
+    (Graph.Edge[CommandGraphNode], IndexedSeq[Graph.Node[CommandGraphNode]]) = {
     other.inputFile match {
       case None =>
-        val inputEdges = Graph.unshiftEdges(this, Vector(output), 2);
+        val inputEdges = Graph.unshiftEdges(DiffCommandGraphNode(), Vector(output), 2);
         val (input1Edge, nodes1) = CommandGraph.unshiftCommands(tail, inputEdges(0));
         val (input2Edge, nodes2) = CommandGraph.unshiftCommands(other.commands ++ tail, inputEdges(1));
-        val teeInputEdge = Graph.unshiftEdges(TeeCommandNode(2), Vector(input1Edge, input2Edge), 1)(0);
+        val teeInputEdge = Graph.unshiftEdges(TeeCommandGraphNode(), Vector(input1Edge, input2Edge), 1)(0);
         (teeInputEdge, nodes1 ++ nodes2);
-    throw new AssertionError("作りかけ");
       case Some(inputFile) =>
-        val inputEdges = Graph.unshiftEdges(this, Vector(output), 2);
+        val inputEdges = Graph.unshiftEdges(DiffCommandGraphNode(), Vector(output), 2);
         val (input1Edge, nodes1) = CommandGraph.unshiftCommands(tail, inputEdges(0));
         val (input2Edge, nodes2) = CommandGraph.unshiftCommands(other.commands ++ tail, inputEdges(1));
-        val otherInputNode = CommandGraph.unshift(FileInputCommandNode(other.inputFormat, inputFile), input2Edge);
+        val otherInputNode = CommandGraph.unshift(FileInputCommandGraphNode(other.inputFormat, inputFile), input2Edge);
         (input1Edge, (nodes1 :+ otherInputNode) ++ nodes2);
     }
   }
+
+}
+
+case class DiffCommandGraphNode (
+) extends CommandGraphNode {
+
+  def toProcessNode(node: Graph.Node[CommandGraphNode],
+    newNexts: IndexedSeq[Graph.Edge[CommandGraphNode]]): Graph.Node[CommandGraphNode] =
+    toProcessNodeDefault(node, newNexts);
 
 }
 
