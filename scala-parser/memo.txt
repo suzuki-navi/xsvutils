@@ -17,11 +17,21 @@
 
 ## Scalaによるパーサへのリプレイス手順
 
-- Makefile 整理
-- 過去バージョンへのパッチの仕組み
-- --jvm, --install-rt を廃止、既存の java,scala ソースを削除
+- --jvm, --install-rt を廃止
+- build-makefile.sh 整理 (ソースファイル一覧の仕組み)
+- src ディレクトリにScalaパーサのソースを追加、 main.pl に --jvm 復活
+- --jvm をデフォルトに変更
 
-- src ディレクトリにScalaパーサのソースを追加、 main.pl から
+
+## 依存しているもの
+
+- mkfifo
+- cat
+- tail
+- iconv
+- gunzip
+- xz
+- perl
 
 
 ## メモ

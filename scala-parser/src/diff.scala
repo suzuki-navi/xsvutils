@@ -199,5 +199,9 @@ case class DiffCommandGraphNode (
     newNexts: IndexedSeq[Graph.Edge[CommandGraphNode]]): Graph.Node[CommandGraphNode] =
     toProcessNodeDefault(node, newNexts);
 
+  def toTask(inputs: IndexedSeq[FilePath], outputs: IndexedSeq[FilePath]): ProcessBuildingTask = {
+    ForkProcessBuildingTask(Left("diff") :: Right(inputs(0)) :: Right(inputs(1)) :: Nil, None, Some(outputs(0)));
+  }
+
 }
 

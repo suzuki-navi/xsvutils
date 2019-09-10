@@ -52,7 +52,13 @@ object Main {
   }
 
   private def execCommands(commands: IndexedSeq[Graph.Node[CommandGraphNode]]): Unit = {
-    ProcessSeqBuilder.build(commands);
+    val tasks = ProcessSeqBuilder.build(commands);
+    tasks.foreach { t =>
+      t.messages.foreach { line =>
+        println(line);
+      }
+      //pprint.pprintln(t);
+    }
     //pprint.pprintln(commands); // TODO
   }
 

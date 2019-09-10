@@ -94,6 +94,8 @@ trait CommandGraphNode {
     }
   }
 
+  def toTask(inputs: IndexedSeq[FilePath], outputs: IndexedSeq[FilePath]): ProcessBuildingTask;
+
 }
 
 case class FileInputCommandGraphNode (
@@ -119,6 +121,11 @@ case class FileInputCommandGraphNode (
     val newNode = Graph.Node[CommandGraphNode](nodes.head, Vector(newEdge), 0);
     newNode;
   }
+
+  def toTask(inputs: IndexedSeq[FilePath], outputs: IndexedSeq[FilePath]): ProcessBuildingTask = {
+    throw new AssertionError(); // ここにはこないはず
+  }
+
 }
 
 object FileInputCommandGraphNode {
@@ -152,6 +159,11 @@ case class RawFileInputCommandGraphNode (
     newNexts: IndexedSeq[Graph.Edge[CommandGraphNode]]): Graph.Node[CommandGraphNode] =
     toProcessNodeDefault(node, newNexts);
 
+  def toTask(inputs: IndexedSeq[FilePath], outputs: IndexedSeq[FilePath]): ProcessBuildingTask = {
+    val input = formatResult.path;
+    ForkProcessBuildingTask(Left("cat") :: Nil, Some(input), Some(outputs(0)));
+  }
+
 }
 
 case class FileOutputCommandGraphNode (
@@ -162,50 +174,9 @@ case class FileOutputCommandGraphNode (
     newNexts: IndexedSeq[Graph.Edge[CommandGraphNode]]): Graph.Node[CommandGraphNode] =
     toProcessNodeDefault(node, newNexts);
 
-}
-
-object ProcessSeqBuilder {
-
-  def build(inputs: IndexedSeq[Graph.Node[CommandGraphNode]]) {
-
-    @scala.annotation.tailrec
-    def sub(inputs: IndexedSeq[Graph.Node[CommandGraphNode]], edges: IndexedSeq[Graph.Edge[CommandGraphNode]]) {
-      inputs.find { node =>
-        val a = inputs.count(_ == node);
-        node.prevCount <= a;
-      } match {
-        case Some(node) =>
-          val outputEdges = node.nexts;
-          val edges2 = edges ++ outputEdges;
-          subNode(node, edges2, edges.size);
-          val inputs2 = outputEdges.map(e => e.next) ++ inputs.filter(_ != node);
-          sub(inputs2, edges2);
-        case None =>
-          if (inputs.nonEmpty) {
-            throw new AssertionError();
-          }
-      }
-    }
-
-    def subNode(node: Graph.Node[CommandGraphNode], edges: IndexedSeq[Graph.Edge[CommandGraphNode]], offset: Int) {
-      (0 until node.prevCount).foreach { j =>
-        val edgeIndex = edges.indexWhere(e => e.next == node && e.id == j);
-        if (edgeIndex < 0) {
-          throw new AssertionError();
-        }
-        println("# < %d".format(edgeIndex));
-      }
-      (offset until edges.size).foreach { edgeIndex =>
-        //val edge = edges(i);
-        println("# > %d".format(edgeIndex));
-      }
-      pprint.pprintln(node.payload);
-      println("");
-    }
-
-    val inputs2: IndexedSeq[Graph.Node[CommandGraphNode]] = CommandGraph.toProcessNode(inputs);
-    sub(inputs2, Vector.empty);
-
+  def toTask(inputs: IndexedSeq[FilePath], outputs: IndexedSeq[FilePath]): ProcessBuildingTask = {
+    val output = UserFilePath(path); // TODO 空文字列の対応
+    ForkProcessBuildingTask(Left("cat") :: Nil, Some(inputs(0)), Some(output));
   }
 
 }

@@ -37,19 +37,13 @@ object FormatReader {
   implicit val ec = ProcessUtil.executorContext;
 
   case class Result (
-    origPath: String,
-    pipePath: Option[String],
-    flagPath: String,
+    path: FilePath,
+    flagPath: WorkingFilePath,
     compressionType: List[CompressionType], // "gz", "xz"
     newlineType: NewlineType,  // "unix", "dos", "mac"
     tableFormat: InputTableFormat,    // tsv, csv
     charencoding: Charencoding, // "utf8", "utf8-bom", "sjis"
-  ) {
-    def path: String = pipePath match {
-      case Some(p) => p;
-      case None => origPath;
-    }
-  }
+  );
 
   private val mulang_source_dir: String = {
     val d = System.getenv("MULANG_SOURCE_DIR");
@@ -65,25 +59,25 @@ object FormatReader {
     val path = file.path; // TODO 空文字列の場合
     Future[Result] {
 
-      val pingPath = working_dir + "/input-" + id + "-ping.fifo";
-      val flagPath = working_dir + "/input-" + id + "-flags.txt";
-      val pipePath = working_dir + "/input-" + id + "-pipe.txt";
-      ProcessUtil.mkfifo(pingPath);
-      ProcessUtil.mkfifo(pipePath);
+      val pingPath = WorkingFilePath("input-" + id + "-ping.fifo");
+      val flagPath = WorkingFilePath("input-" + id + "-flags.txt");
+      val pipePath = WorkingFilePath("input-" + id + "-pipe.tsv");
+      ProcessUtil.mkfifo(pingPath.path);
+      ProcessUtil.mkfifo(pipePath.path);
       val command = List(
         "perl",
         mulang_source_dir + "/format-detector.pl",
-        "-f", flagPath,
-        "-p", pingPath,
+        "-f", flagPath.path,
+        "-p", pingPath.path,
         "-i", path,
-        "-o", pipePath);
+        "-o", pipePath.path);
 
       val future1 = Future[Unit] {
         ProcessUtil.doProcess(command);
       }
 
       val future2 = Future[Unit] {
-        val fp1 = scala.io.Source.fromFile(pingPath);
+        val fp1 = scala.io.Source.fromFile(pingPath.path);
         try {
           fp1.getLines.toList;
         } finally {
@@ -96,7 +90,7 @@ object FormatReader {
       future2.onComplete { t => promise.tryComplete(t) }
       Await.ready(promise.future, Duration.Inf);
 
-      val fp = scala.io.Source.fromFile(flagPath);
+      val fp = scala.io.Source.fromFile(flagPath.path);
       val lines = try {
         fp.getLines.toList;
       } finally {
@@ -107,13 +101,8 @@ object FormatReader {
     }
   }
 
-  private def newResult(lines: List[String],
-    file: FileInputCommandGraphNode, pipePath: String, flagPath: String): Result = {
-    val pipePathOpt = if (lines.contains("pipe")) {
-      Some(pipePath);
-    } else {
-      None;
-    }
+  private def newResult(lines: List[String], file: FileInputCommandGraphNode,
+    pipePath: WorkingFilePath, flagPath: WorkingFilePath): Result = {
     val compressionType = lines.flatMap {
       case "gz" => CompressionType.Gz :: Nil;
       case "xz" => CompressionType.Xz :: Nil;
@@ -143,7 +132,12 @@ object FormatReader {
     } else {
       Charencoding.Utf8;
     }
-    Result(file.path, pipePathOpt, flagPath,
+    val path = if (lines.contains("pipe")) {
+      UserPipePath(file.path, pipePath.name, compressionType);
+    } else {
+      UserFilePath(file.path);
+    }
+    Result(path, flagPath,
       compressionType, newlineType, tableFormat, charencoding);
   }
 

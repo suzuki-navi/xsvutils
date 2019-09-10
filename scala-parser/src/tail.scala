@@ -8,5 +8,10 @@ case class BomTailCommandGraphNode (
     newNexts: IndexedSeq[Graph.Edge[CommandGraphNode]]): Graph.Node[CommandGraphNode] =
     toProcessNodeDefault(node, newNexts);
 
+  def toTask(inputs: IndexedSeq[FilePath], outputs: IndexedSeq[FilePath]): ProcessBuildingTask = {
+    ForkProcessBuildingTask(Left("tail") :: Left("-c+4") :: Nil,
+      Some(inputs(0)), Some(outputs(0)));
+  }
+
 }
 
