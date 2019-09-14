@@ -32,6 +32,23 @@ sub escape_for_bash {
 }
 
 ################################################################################
+# use jvm if --java
+# switch parser to scala implementation
+################################################################################
+
+sub forkJvm {
+    my ($argv) = @_;
+    exec("$TOOL_DIR/xsvutils-scala", @$argv);
+    die;
+}
+
+if (@ARGV && $ARGV[0] eq '--jvm') {
+    my @argv = @ARGV;
+    shift(@argv);
+    forkJvm(\@argv);
+}
+
+################################################################################
 # parse command line options for help
 ################################################################################
 

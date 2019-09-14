@@ -14,8 +14,8 @@ TARGET_SOURCES1=$(echo $((
             echo target/xsvutils-go;
             # echo target/xsvutils-ml;
             echo target/xsvutils-rs;
+            echo target/xsvutils-scala
             echo target/mcut;
-            echo target/java;
             perl etc/list-sources.pl legacy | grep -v -E -e '(boot\.sh)' | grep -v '\.(java|scala)$' | sed 's/^/target\//g';
             bash etc/list-help.sh all | sed 's/^/target\/help-/g';
             echo target/help-guide-version.txt;
@@ -24,6 +24,7 @@ TARGET_SOURCES2=$(echo $((
             echo target/xsvutils-go;
             # echo target/xsvutils-ml;
             echo target/xsvutils-rs;
+            echo target/xsvutils-scala
             echo target/mcut;
             perl etc/list-sources.pl legacy | grep -v -E -e '(boot\.sh)' | grep -v '\.(java|scala)$' | sed 's/^/target\//g';
             bash etc/list-help.sh all | sed 's/^/target\/help-/g';
@@ -239,4 +240,12 @@ target/xsvutils-ml: $(ML_TGT)
 var/ocaml-target/%.ml: src/*.ml
 	@mkdir -p var/ocaml-target
 	cp $< $@
+
 EOF
+
+cat <<'EOF'
+target/xsvutils-scala: var/xsvutils-scala
+	cp var/xsvutils-scala target/xsvutils-scala
+
+EOF
+
