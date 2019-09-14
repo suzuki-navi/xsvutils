@@ -8,7 +8,7 @@ case class TeeCommandGraphNode (
     toProcessNodeDefault(node, newNexts);
 
   def toTask(inputs: IndexedSeq[FilePath], outputs: IndexedSeq[FilePath]): ProcessBuildingTask = {
-    ForkProcessBuildingTask(Left("tee") :: Right(outputs(1)) :: Nil, Some(inputs(0)), Some(outputs(0)));
+    ForkProcessBuildingTask(this, Left("tee") :: Right(outputs(1)) :: Nil, inputs(0), outputs(0));
   }
 
 }

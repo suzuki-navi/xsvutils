@@ -1,5 +1,8 @@
 // mulang-bin-sources: scala
 
+import scala.concurrent.Await;
+import scala.concurrent.Future;
+
 object Main {
 
   def main(args: Array[String]): Unit = {
@@ -52,14 +55,38 @@ object Main {
   }
 
   private def execCommands(commands: IndexedSeq[Graph.Node[CommandGraphNode]]): Unit = {
-    val tasks = ProcessSeqBuilder.build(commands);
-    tasks.foreach { t =>
-      t.messages.foreach { line =>
-        println(line);
-      }
-      //pprint.pprintln(t);
+    val ps = ProcessBuilder.build(commands);
+    ps.explain();
+    //val future: Future[Unit] = ps.start();
+    //Await.ready(future, scala.concurrent.duration.Duration.Inf);
+  }
+
+  def isOutputTty: Boolean = {
+    terminalLines.nonEmpty && terminalCols.nonEmpty;
+  }
+
+  def terminalLines: Option[Int] = {
+    Option(System.getenv("TERMINAL_LINES")) match {
+      case None => None;
+      case Some(s) =>
+        try {
+          Some(s.toInt);
+        } catch {
+          case _: NumberFormatException => None;
+        }
     }
-    //pprint.pprintln(commands); // TODO
+  }
+
+  def terminalCols: Option[Int] = {
+    Option(System.getenv("TERMINAL_COLS")) match {
+      case None => None;
+      case Some(s) =>
+        try {
+          Some(s.toInt);
+        } catch {
+          case _: NumberFormatException => None;
+        }
+    }
   }
 
 }

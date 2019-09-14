@@ -174,15 +174,16 @@ case class DiffCommandPipeNode (
 
   def addNodeToGraph(output: Graph.Edge[CommandGraphNode]):
     (Graph.Edge[CommandGraphNode], IndexedSeq[Graph.Node[CommandGraphNode]]) = {
+    val inputEdges: IndexedSeq[Graph.Edge[CommandGraphNode]] = Graph.unshiftEdges(DiffCommandGraphNode(), Vector(output), 2).map { edge =>
+      Graph.unshiftEdges(ToDiffableCommandGraphNode(), Vector(edge), 1)(0);
+    }
     other.inputFile match {
       case None =>
-        val inputEdges = Graph.unshiftEdges(DiffCommandGraphNode(), Vector(output), 2);
         val (input1Edge, nodes1) = CommandGraph.unshiftCommands(tail, inputEdges(0));
         val (input2Edge, nodes2) = CommandGraph.unshiftCommands(other.commands ++ tail, inputEdges(1));
         val teeInputEdge = Graph.unshiftEdges(TeeCommandGraphNode(), Vector(input1Edge, input2Edge), 1)(0);
         (teeInputEdge, nodes1 ++ nodes2);
       case Some(inputFile) =>
-        val inputEdges = Graph.unshiftEdges(DiffCommandGraphNode(), Vector(output), 2);
         val (input1Edge, nodes1) = CommandGraph.unshiftCommands(tail, inputEdges(0));
         val (input2Edge, nodes2) = CommandGraph.unshiftCommands(other.commands ++ tail, inputEdges(1));
         val otherInputNode = CommandGraph.unshift(FileInputCommandGraphNode(other.inputFormat, inputFile), input2Edge);
@@ -200,7 +201,7 @@ case class DiffCommandGraphNode (
     toProcessNodeDefault(node, newNexts);
 
   def toTask(inputs: IndexedSeq[FilePath], outputs: IndexedSeq[FilePath]): ProcessBuildingTask = {
-    ForkProcessBuildingTask(Left("diff") :: Right(inputs(0)) :: Right(inputs(1)) :: Nil, None, Some(outputs(0)));
+    ForkProcessBuildingTask(this, Left("diff") :: Right(inputs(0)) :: Right(inputs(1)) :: Nil, NullPath, outputs(0));
   }
 
 }

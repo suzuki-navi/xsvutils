@@ -14,25 +14,54 @@
 新しい仕様ではコマンド名と解釈する。コマンド名と同じ名前のファイルが偶然存在していたとしても
 コマンド名を優先する。実行環境による解釈の揺れを少しでも減らすためである。
 
+標準出力が端末の場合 --o-csv などを指定しても、従来はtableフォーマットでのlessで表示だったが、
+新しい仕様ではcsvフォーマットでのlessでの表示になる。
+
 
 ## Scalaによるパーサへのリプレイス手順
 
-- --jvm, --install-rt を廃止
-- build-makefile.sh 整理 (ソースファイル一覧の仕組み)
-- src ディレクトリにScalaパーサのソースを追加、 main.pl に --jvm 復活
-- --jvm をデフォルトに変更
+- 9月リリース目標
+    - --jvm, --install-rt を廃止
+    - build-makefile.sh 整理 (ソースファイル一覧の仕組み)
+- 10月リリース目標
+    - src ディレクトリにScalaパーサのソースを追加、 main.pl に --jvm 復活
+    - --jvm でのサポートは試験的にごく一部のみ
+- 11月以降
+    - --jvm をデフォルトに変更
 
 
 ## 依存しているもの
 
 - mkfifo
+- test
+- tput
 - cat
 - tail
 - iconv
 - gunzip
 - xz
 - perl
+- less
+    - 結果またはヘルプの端末への出力
+- git
+    - 過去バージョンのビルドのため
+- make
+    - 最新バージョンおよび過去バージョンのビルドのため
+- curl
+    - 最新バージョンおよび過去バージョンのビルドのため
 
+
+## 実装のメモ
+
+- CommandSeqParserStatus
+    - CommandPipeNode
+    - CommandParserStatus
+- CommandNodeSeq
+    - CommandPipeNode
+- IndexedSeq[Graph.Node[CommandGraphNode]]
+    - CommandGraphNode
+- ProcessBuilder
+    - ProcessBuildingTask
 
 ## メモ
 

@@ -1,16 +1,18 @@
 // mulang-bin-sources: scala
 
-case class BomTailCommandGraphNode (
+case class CatCommandGraphNode (
+  input: Option[FilePath],
+  output: Option[FilePath],
 ) extends CommandGraphNode {
-  // tail -c+4
 
   def toProcessNode(node: Graph.Node[CommandGraphNode],
     newNexts: IndexedSeq[Graph.Edge[CommandGraphNode]]): Graph.Node[CommandGraphNode] =
     toProcessNodeDefault(node, newNexts);
 
   def toTask(inputs: IndexedSeq[FilePath], outputs: IndexedSeq[FilePath]): ProcessBuildingTask = {
-    ForkProcessBuildingTask(this, Left("tail") :: Left("-c+4") :: Nil,
-      inputs(0), outputs(0));
+    val input2 = input.getOrElse(inputs(0));
+    val output2 = output.getOrElse(outputs(0));
+    ForkProcessBuildingTask(this, Left("cat") :: Nil, input2, output2);
   }
 
 }

@@ -9,8 +9,9 @@ case class IconvCommandGraphNode (
     toProcessNodeDefault(node, newNexts);
 
   def toTask(inputs: IndexedSeq[FilePath], outputs: IndexedSeq[FilePath]): ProcessBuildingTask = {
-    ForkProcessBuildingTask(Left("iconv") :: Left("-f") :: Left(charencoding) :: Nil,
-      Some(inputs(0)), Some(outputs(0)));
+    ForkProcessBuildingTask(this, Left("iconv") :: Left("-f") :: Left(charencoding) ::
+      Left("-t") :: Left("UTF-8//TRANSLIT") :: Nil,
+      inputs(0), outputs(0));
   }
 
 }

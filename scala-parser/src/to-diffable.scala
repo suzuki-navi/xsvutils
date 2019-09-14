@@ -1,16 +1,14 @@
 // mulang-bin-sources: scala
 
-case class BomTailCommandGraphNode (
+case class ToDiffableCommandGraphNode (
 ) extends CommandGraphNode {
-  // tail -c+4
 
   def toProcessNode(node: Graph.Node[CommandGraphNode],
     newNexts: IndexedSeq[Graph.Edge[CommandGraphNode]]): Graph.Node[CommandGraphNode] =
     toProcessNodeDefault(node, newNexts);
 
   def toTask(inputs: IndexedSeq[FilePath], outputs: IndexedSeq[FilePath]): ProcessBuildingTask = {
-    ForkProcessBuildingTask(this, Left("tail") :: Left("-c+4") :: Nil,
-      inputs(0), outputs(0));
+    ForkProcessBuildingTask(this, Left("perl") :: Right(SourceFilePath("to-diffable.pl")) :: Nil, inputs(0), outputs(0));
   }
 
 }

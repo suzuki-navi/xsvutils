@@ -32,6 +32,58 @@ object Charencoding {
   case object Sjis extends Charencoding { def name = "sjis" }
 }
 
+case class FileInputCommandGraphNode (
+  tableFormat: Option[InputTableFormat],
+  path: String, // 空文字列は標準入力の意味
+) extends CommandGraphNode {
+
+  private[this] val formatReaderFuture: Future[FormatReader.Result] = {
+    FileInputCommandGraphNode.fileInputCount = FileInputCommandGraphNode.fileInputCount + 1;
+    FormatReader.read(this, FileInputCommandGraphNode.fileInputCount);
+  }
+
+  def toProcessNode(node: Graph.Node[CommandGraphNode],
+    newNexts: IndexedSeq[Graph.Edge[CommandGraphNode]]): Graph.Node[CommandGraphNode] = {
+    val newNext = newNexts(0);
+    val result: FormatReader.Result = Await.result(formatReaderFuture, Duration.Inf);
+    val nodes = FileInputCommandGraphNode.toCommandGraphNodeSeq(result);
+    val newEdge = nodes.tail.reverse.foldLeft[Graph.Edge[CommandGraphNode]](newNext) { (edge, node) =>
+      val newNode = Graph.Node[CommandGraphNode](node, Vector(edge), 1);
+      val newEdge = Graph.Edge[CommandGraphNode](newNode, 0);
+      newEdge;
+    }
+    val newNode = Graph.Node[CommandGraphNode](nodes.head, Vector(newEdge), 0);
+    newNode;
+  }
+
+  def toTask(inputs: IndexedSeq[FilePath], outputs: IndexedSeq[FilePath]): ProcessBuildingTask = {
+    throw new AssertionError(); // ここにはこないはず
+  }
+
+}
+
+object FileInputCommandGraphNode {
+
+  private var fileInputCount: Int = 0;
+
+  private def toCommandGraphNodeSeq(result: FormatReader.Result):
+    List[CommandGraphNode] = {
+    val newlineTypeNodes = Nil; // TODO
+    val tableFormatNodes = Nil; // TODO
+    val charencodingNodes = result.charencoding match {
+      case Charencoding.Utf8 =>
+        Nil;
+      case Charencoding.Utf8bom =>
+        BomTailCommandGraphNode() :: Nil;
+      case Charencoding.Sjis =>
+        IconvCommandGraphNode("cp932") :: Nil;
+    }
+    CatCommandGraphNode(Some(result.path), None) ::
+      newlineTypeNodes ::: tableFormatNodes ::: charencodingNodes;
+  }
+
+}
+
 object FormatReader {
 
   implicit val ec = ProcessUtil.executorContext;
@@ -53,10 +105,9 @@ object FormatReader {
       d;
     }
   }
-  private val working_dir: String = "./tmp"; // TODO
 
   def read(file: FileInputCommandGraphNode, id: Int): Future[Result] = {
-    val path = file.path; // TODO 空文字列の場合
+    val path = file.path;
     Future[Result] {
 
       val pingPath = WorkingFilePath("input-" + id + "-ping.fifo");
@@ -64,16 +115,27 @@ object FormatReader {
       val pipePath = WorkingFilePath("input-" + id + "-pipe.tsv");
       ProcessUtil.mkfifo(pingPath.path);
       ProcessUtil.mkfifo(pipePath.path);
-      val command = List(
-        "perl",
-        mulang_source_dir + "/format-detector.pl",
-        "-f", flagPath.path,
-        "-p", pingPath.path,
-        "-i", path,
-        "-o", pipePath.path);
-
-      val future1 = Future[Unit] {
-        ProcessUtil.doProcess(command);
+      val future1: Future[Unit] = if (path.isEmpty) {
+        val command = List(
+          "perl",
+          mulang_source_dir + "/input-format-detector.pl",
+          "-f", flagPath.path,
+          "-p", pingPath.path,
+          "-o", pipePath.path);
+        Future[Unit] {
+          ProcessUtil.doProcess(command, ProcessUtil.Stdin, ProcessUtil.NullOutput);
+        }
+      } else {
+        val command = List(
+          "perl",
+          mulang_source_dir + "/input-format-detector.pl",
+          "-f", flagPath.path,
+          "-p", pingPath.path,
+          "-i", path,
+          "-o", pipePath.path);
+        Future[Unit] {
+          ProcessUtil.doProcess(command, ProcessUtil.NullInput, ProcessUtil.NullOutput);
+        }
       }
 
       val future2 = Future[Unit] {
@@ -132,10 +194,12 @@ object FormatReader {
     } else {
       Charencoding.Utf8;
     }
-    val path = if (lines.contains("pipe")) {
-      UserPipePath(file.path, pipePath.name, compressionType);
-    } else {
+    val path = if (!lines.contains("pipe")) {
       UserFilePath(file.path);
+    } else if (file.path.isEmpty) {
+      StdinPipePath(pipePath.name, compressionType);
+    } else {
+      UserPipePath(file.path, pipePath.name, compressionType);
     }
     Result(path, flagPath,
       compressionType, newlineType, tableFormat, charencoding);

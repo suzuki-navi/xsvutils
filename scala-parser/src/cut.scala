@@ -99,7 +99,7 @@ case class CutCommandNode (
     toProcessNodeDefault(node, newNexts);
 
   def toTask(inputs: IndexedSeq[FilePath], outputs: IndexedSeq[FilePath]): ProcessBuildingTask = {
-    ForkProcessBuildingTask(Left("todo-cut") :: Nil, Some(inputs(0)), Some(outputs(0))); // TODO
+    ForkProcessBuildingTask(this, Left("todo-cut") :: Nil, inputs(0), outputs(0)); // TODO
   }
 
 }
