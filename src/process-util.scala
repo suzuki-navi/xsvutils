@@ -1,4 +1,4 @@
-// mulang-bin-sources: scala
+// mulang-bin-sources: main-jvm
 
 import java.io.ByteArrayInputStream;
 import java.io.File;

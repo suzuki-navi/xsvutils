@@ -1,6 +1,6 @@
-// mulang-bin-sources: scala
+// mulang-bin-sources: main-jvm
 
-case class ToDiffableCommandGraphNode (
+case class TeeCommandGraphNode (
 ) extends CommandGraphNode {
 
   def toProcessNode(node: Graph.Node[CommandGraphNode],
@@ -8,7 +8,7 @@ case class ToDiffableCommandGraphNode (
     toProcessNodeDefault(node, newNexts);
 
   def toTask(inputs: IndexedSeq[FilePath], outputs: IndexedSeq[FilePath]): ProcessBuildingTask = {
-    ForkProcessBuildingTask(this, Left("perl") :: Right(SourceFilePath("to-diffable.pl")) :: Nil, inputs(0), outputs(0));
+    ForkProcessBuildingTask(this, Left("tee") :: Right(outputs(1)) :: Nil, inputs(0), outputs(0));
   }
 
 }

@@ -1,4 +1,4 @@
-// mulang-bin-sources: scala
+// mulang-bin-sources: main-jvm
 
 import scala.concurrent.Await;
 import scala.concurrent.Future;

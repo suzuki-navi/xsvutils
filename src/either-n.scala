@@ -1,4 +1,4 @@
-// mulang-bin-sources: scala
+// mulang-bin-sources: main-jvm
 
 sealed abstract class Either2[+A, +B] extends Product with Serializable;
 

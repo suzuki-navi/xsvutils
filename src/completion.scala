@@ -1,4 +1,4 @@
-// mulang-bin-sources: scala
+// mulang-bin-sources: main-jvm
 
 trait Completion {
   def isFilePath: Boolean;

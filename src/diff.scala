@@ -1,4 +1,4 @@
-// mulang-bin-sources: scala
+// mulang-bin-sources: main-jvm
 
 object DiffCommandParser extends CommandParser {
   def initStatus(argIdx: Int): CommandParserStatus = {

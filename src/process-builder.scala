@@ -1,4 +1,4 @@
-// mulang-bin-sources: scala
+// mulang-bin-sources: main-jvm
 
 import java.io.IOException;
 import scala.concurrent.Await;

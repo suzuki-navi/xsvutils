@@ -1,4 +1,4 @@
-// mulang-bin-sources: scala
+// mulang-bin-sources: main-jvm
 
 case class IconvCommandGraphNode (
   charencoding: String, // UTF-8, cp932
