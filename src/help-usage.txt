@@ -47,3 +47,8 @@ USAGE:
 
     詳細は `xsvutils help compatibility` を見ること。
 
+    以下のように最初のパラメータに --x-jvm を指定すると、Scalaによる実装のパーサでの動作になる。
+    Scalaによる実装のパーサはまだ従来の実相のすべての機能をサポートしているわけではない。
+
+        $ xsvutils --x-jvm ...
+

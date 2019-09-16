@@ -8,11 +8,14 @@ To see compatibility information, `xsvutils help compatibility`.
 
 出力オプション `--o-chart2` が追加された。
 
-実行時のJava依存の機能が削除され、 --install-rt, --jvm は廃止された。
+従来の実行時のJava依存の機能が削除され、 --install-rt, --jvm は廃止された。
 
 以下のコマンドが廃止された。
 - cutidx
 - stridx
+
+Scalaによる実装のパーサを実験的に動かすための --x-jvm が追加された。
+--x-jvm はまだほとんどの機能が実装されていない。
 
 
 ## v12 -> v13 (2019/08/13)

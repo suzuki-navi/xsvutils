@@ -60,3 +60,8 @@ Available subcommands:
         $ xsvutils <SUBCOMMAND> --help
     で確認できる。
 
+`--x-jvm` での実装メモ:
+    ほとんどすべてのサブコマンドが --x-jvm において未実装。
+
+    実装済みサブコマンド: なし
+

@@ -101,4 +101,6 @@ HTMLでのチャート形式の出力について:
 
             java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssX")
 
+`--x-jvm` での実装メモ:
+    ほとんどすべての機能が --x-jvm において未実装。
 

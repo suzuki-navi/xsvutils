@@ -49,11 +49,15 @@ Common options for developer:
 
     xsvutils開発者向けの説明は `xsvutils help development` を参照のこと。
 
+`--x-jvm` での実装メモ:
+    ほとんどすべてのオプションが --x-jvm において未実装。
+
 特殊なオプション:
     以下のオプションは他のオプションよりも前に付与する必要がある。
     かつ、以下の番号順に付与する必要がある。
 
     1. -v8 などのバージョン指定 (詳しくは `xsvutils help compatibility`)
     2. --install
-    3. --explain (詳しくは `xsvutils help development`)
+    3. --x-jvm
+    4. --explain (詳しくは `xsvutils help development`)
 
