@@ -42,7 +42,7 @@ sub forkJvm {
     die;
 }
 
-if (@ARGV && $ARGV[0] eq '--jvm') {
+if (@ARGV && $ARGV[0] eq '--x-jvm') {
     my @argv = @ARGV;
     shift(@argv);
     forkJvm(\@argv);
