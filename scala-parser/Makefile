@@ -3,7 +3,7 @@ build: scala-parser
 
 scala-parser: FORCE var/mulang/mulang
 	@ ./var/mulang/mulang --devel
-	@ if [ ! -e $@ ] || ! cmp -s var/out.sh $@; then cp var/out.sh $@; fi
+	@ if [ ! -e $@ ] || ! cmp -s var/out-devel.sh $@; then cp var/out-devel.sh $@; fi
 
 var/mulang/mulang:
 	mkdir -p var/mulang
