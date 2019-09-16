@@ -22,6 +22,11 @@ xsvutils_source_dir=$(cd $(dirname $(readlink -f $0))/.. && pwd)
     make --question -f var/makefile-legacy target || make -s -f var/makefile-legacy target || exit $?
 ) >&2 || exit $?
 
+rm -rf $xsvutils_source_dir/var/working_dir
+mkdir $xsvutils_source_dir/var/working_dir
+export MULANG_SOFT_WORKING_DIR=$xsvutils_source_dir/var/working_dir
+export MULANG_SOURCE_DIR=$xsvutils_source_dir/var/build-by-mulang/var/target-devel
+
 export XSVUTILS_TOOL_DIR=$xsvutils_source_dir/target
 exec bash $xsvutils_source_dir/src/boot.sh "$@"
 
