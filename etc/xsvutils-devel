@@ -1,12 +1,25 @@
 #!/bin/bash
 
-xsvutils_source_dir=$(cd $(dirname $(readlink $0))/.. && pwd)
+xsvutils_source_dir=$(cd $(dirname $(readlink -f $0))/.. && pwd)
 
 (
     cd $xsvutils_source_dir
-    bash etc/build-makefile.sh > var/makefile.tmp
-    mv var/makefile.tmp var/makefile
-    make --question -f var/makefile target || make -s -f var/makefile target || exit $?
+
+    mkdir -p var/build-by-mulang
+    if [ ! -e var/build-by-mulang/src ]; then
+        ln -s ../../src var/build-by-mulang/src
+    fi
+    (
+        cd var/build-by-mulang
+        ../mulang/mulang --devel || exit $?
+    ) || exit $?
+    if [ ! -e target/xsvutils-scala ] || ! cmp -s var/build-by-mulang/var/out-devel.sh target/xsvutils-scala; then
+        cp var/build-by-mulang/var/out-devel.sh target/xsvutils-scala
+    fi
+
+    bash etc/build-makefile.sh > var/makefile-legacy.tmp
+    mv var/makefile-legacy.tmp var/makefile-legacy
+    make --question -f var/makefile-legacy target || make -s -f var/makefile-legacy target || exit $?
 ) >&2 || exit $?
 
 export XSVUTILS_TOOL_DIR=$xsvutils_source_dir/target

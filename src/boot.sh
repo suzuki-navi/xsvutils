@@ -8,6 +8,7 @@ if [[ $VERSION_HASH =~ X_VERSION_HASH_X ]]; then
         # ./etc/xsvutils-devel を使ってください
         exit 1
     fi
+    # etc/xsvutils-devel から呼び出されたと場合にここに到達する
     export TOOL_DIR=$XSVUTILS_TOOL_DIR
 else
     export TOOL_DIR=$HOME/.xsvutils/version-$VERSION_HASH
