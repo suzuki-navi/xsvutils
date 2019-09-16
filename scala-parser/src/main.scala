@@ -1,5 +1,6 @@
 // mulang-bin-sources: scala
 
+import java.io.IOException;
 import scala.concurrent.Await;
 import scala.concurrent.Future;
 
@@ -86,6 +87,20 @@ object Main {
         } catch {
           case _: NumberFormatException => None;
         }
+    }
+  }
+
+  val sourceDir: String = {
+    Option(System.getenv("MULANG_SOURCE_DIR")) match {
+      case None => throw new IOException();
+      case Some(s) => s;
+    }
+  }
+
+  val softWorkingDir: String = {
+    Option(System.getenv("MULANG_SOFT_WORKING_DIR")) match {
+      case None => throw new IOException();
+      case Some(s) => s;
     }
   }
 

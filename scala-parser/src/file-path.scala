@@ -28,16 +28,16 @@ case class UserFilePath (
 case class SourceFilePath (
   name: String,
 ) extends FilePath {
-  def path: String = "./src/" + name; // TODO
-  def debugStr: String = "./src/" + name; // TODO
+  def path: String = Main.sourceDir + "/" + name;
+  def debugStr: String = "@SOURCE_DIR" + "/" + name;
   def taskMessages: List[String] = Nil;
 }
 
 case class WorkingFilePath (
   name: String,
 ) extends FilePath {
-  def path: String = "./tmp/" + name; // TODO
-  def debugStr: String = "./tmp/" + name; // TODO
+  def path: String = Main.softWorkingDir + "/" + name;
+  def debugStr: String = "@WORKING_DIR" + "/" + name;
   def taskMessages: List[String] = Nil;
 }
 
@@ -46,8 +46,8 @@ case class UserPipePath (
   pipeName: String,
   compressionType: List[CompressionType],
 ) extends FilePath {
-  def path: String = "./tmp/" + pipeName; // TODO
-  def debugStr: String = "./tmp/" + pipeName; // TODO
+  def path: String = Main.softWorkingDir + "/" + pipeName;
+  def debugStr: String = "@WORKING_DIR" + "/" + pipeName;
   def taskMessages: List[String] = {
     MkfifoInfo(WorkingFilePath(pipeName)).message ::
     ("$ cat " + origPath + " \\") ::
@@ -64,20 +64,20 @@ case class StdinPipePath (
   pipeName: String,
   compressionType: List[CompressionType],
 ) extends FilePath {
-  def path: String = "./tmp/" + pipeName; // TODO
-  def debugStr: String = "$stdin";
+  def path: String = Main.softWorkingDir + "/" + pipeName;
+  def debugStr: String = "@stdin";
   def taskMessages: List[String] = UserPipePath("$stdin", pipeName, compressionType).taskMessages;
 }
 
 case object StdoutPipePath extends FilePath {
   def path: String = "/dev/stdout";
-  def debugStr: String = "$stdout";
+  def debugStr: String = "@stdout";
   def taskMessages: List[String] = Nil;
 }
 
 case object NullPath extends FilePath {
   def path: String = "/dev/null";
-  def debugStr: String = "$null";
+  def debugStr: String = "@null";
   def taskMessages: List[String] = Nil;
 }
 
