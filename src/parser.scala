@@ -4,20 +4,28 @@ object OptionParser {
 
   def parseCommands(args: List[String], ctxt: OptionParserContext):
     Either3[IndexedSeq[Graph.Node[CommandGraphNode]], ParserErrorMessage, HelpDocument] = {
-    parse(args, false, ctxt) match {
-      case Option4A(commands) => Option3A(commands);
-      case Option4B(err) =>      Option3B(err);
-      case Option4C(help) =>     Option3C(help);
-      case Option4D(cmpl) =>     throw new AssertionError(); // ここにはこないはず
+    try {
+      parse(args, false, ctxt) match {
+        case Option4A(commands) => Option3A(commands);
+        case Option4B(err) =>      Option3B(err);
+        case Option4C(help) =>     Option3C(help);
+        case Option4D(cmpl) =>     throw new AssertionError(); // ここにはこないはず
+      }
+    } catch {
+      case e: ParserException =>   Option3B(e.msg);
     }
   }
 
   def parseCompletion(args: List[String], ctxt: OptionParserContext): Option[Completion] = {
-    parse(args, true, ctxt) match {
-      case Option4A(status) => None;
-      case Option4B(err) =>    None;
-      case Option4C(help) =>   None;
-      case Option4D(cmpl) =>   Some(cmpl);
+    try {
+      parse(args, true, ctxt) match {
+        case Option4A(status) => None;
+        case Option4B(err) =>    None;
+        case Option4C(help) =>   None;
+        case Option4D(cmpl) =>   Some(cmpl);
+      }
+    } catch {
+      case e: ParserException => None;
     }
   }
 

@@ -46,7 +46,8 @@ object FileOutputCommandGraphNode {
       UserFilePath(path);
     }
     if (path.isEmpty && Main.isOutputTty) {
-      CatCommandGraphNode(None, Some(path2)) :: Nil; // TODO
+      TableCommandGraphNode(true, true, None, true) ::
+      CatCommandGraphNode(None, Some(path2)) :: Nil;
     } else {
       CatCommandGraphNode(None, Some(path2)) :: Nil;
     }

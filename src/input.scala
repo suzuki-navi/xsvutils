@@ -37,6 +37,11 @@ case class FileInputCommandGraphNode (
   path: String, // 空文字列は標準入力の意味
 ) extends CommandGraphNode {
 
+  if (path.isEmpty && Main.isInputTty) {
+    // 標準入力が端末の場合は入力とはみなさない
+    throw ParserErrorMessage(-1, "stdin expected").toException;
+  }
+
   private[this] val formatReaderFuture: Future[FormatReader.Result] = {
     FileInputCommandGraphNode.fileInputCount = FileInputCommandGraphNode.fileInputCount + 1;
     FormatReader.read(this, FileInputCommandGraphNode.fileInputCount);

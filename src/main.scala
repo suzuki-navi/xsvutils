@@ -1,8 +1,8 @@
 // mulang-bin-sources: main-jvm
 
 import java.io.IOException;
-//import scala.concurrent.Await;
-//import scala.concurrent.Future;
+import scala.concurrent.Await;
+import scala.concurrent.Future;
 
 object Main {
 
@@ -10,32 +10,34 @@ object Main {
     args.toList match {
       case Nil =>
         throw new Exception("command expected");
-      case "parser" :: _ =>
-        throw new Exception("parser not implemented");
-      case "completion" :: _ =>
-        throw new Exception("completion not implemented");
+      case "parser" :: args =>
+        doParser(args);
+      case "completion" :: args =>
+        doCompletion(args);
       case cmd :: _ =>
         throw new Exception("command not found: " + cmd);
     }
     System.exit(0);
   }
 
-/*
-  def main(args: Array[String]): Unit = {
+  private def doParser(args: List[String]): Unit = {
     val ctxt = parserContext();
-    args.toList match {
+    OptionParser.parseCommands(args, ctxt) match {
+      case Option3A(commands) =>
+        execCommands(commands);
+      case Option3B(err) =>
+        error(err, args);
+      case Option3C(help) =>
+        execHelp(help);
+    }
+  }
+
+  private def doCompletion(args: List[String]): Unit = {
+    val ctxt = parserContext();
+    args match {
       case Nil =>
-        throw new Exception("command expected");
-      case "exec" :: args =>
-        OptionParser.parseCommands(args, ctxt) match {
-          case Option3A(commands) =>
-            execCommands(commands);
-          case Option3B(err) =>
-            error(err, args);
-          case Option3C(help) =>
-            execHelp(help);
-        }
-      case "complete" :: sh :: args =>
+        throw new Exception("not enough parameters for completion");
+      case sh :: args =>
         OptionParser.parseCompletion(args, ctxt) match {
           case Some(completion) =>
             // シェル補完を実行
@@ -48,10 +50,7 @@ object Main {
           case None =>
             // nop
         }
-      case cmd :: _ =>
-        throw new Exception("command not found: " + cmd);
     }
-    System.exit(0);
   }
 
   private def parserContext() = new OptionParserContext {
@@ -62,8 +61,12 @@ object Main {
   }
 
   private def error(e: ParserErrorMessage, args: List[String]): Unit = {
-    val a = args(e.argIdx);
-    System.err.println("error: (%d) \"%s\": %s".format(e.argIdx, a, e.message));
+    if (e.argIdx >= 0) {
+      val a = args(e.argIdx);
+      System.err.println("error: (%d) \"%s\": %s".format(e.argIdx, a, e.message));
+    } else {
+      System.err.println("error: %s".format(e.message));
+    }
   }
 
   private def execHelp(help: HelpDocument): Unit = {
@@ -73,17 +76,12 @@ object Main {
   private def execCommands(commands: IndexedSeq[Graph.Node[CommandGraphNode]]): Unit = {
     val ps = ProcessBuilder.build(commands);
     ps.explain();
-    //val future: Future[Unit] = ps.start();
-    //Await.ready(future, scala.concurrent.duration.Duration.Inf);
-  }
-*/
-
-  def isOutputTty: Boolean = {
-    terminalLines.nonEmpty && terminalCols.nonEmpty;
+    val future: Future[Unit] = ps.start();
+    Await.ready(future, scala.concurrent.duration.Duration.Inf);
   }
 
   def terminalLines: Option[Int] = {
-    Option(System.getenv("TERMINAL_LINES")) match {
+    Option(System.getenv("XSVUTILS_TERMINAL_LINES")) match {
       case None => None;
       case Some(s) =>
         try {
@@ -95,7 +93,7 @@ object Main {
   }
 
   def terminalCols: Option[Int] = {
-    Option(System.getenv("TERMINAL_COLS")) match {
+    Option(System.getenv("XSVUTILS_TERMINAL_COLS")) match {
       case None => None;
       case Some(s) =>
         try {
@@ -103,6 +101,20 @@ object Main {
         } catch {
           case _: NumberFormatException => None;
         }
+    }
+  }
+
+  def isInputTty: Boolean = {
+    Option(System.getenv("XSVUTILS_INPUT_TTY")) match {
+      case Some("1") => true;
+      case None => false;
+    }
+  }
+
+  def isOutputTty: Boolean = {
+    Option(System.getenv("XSVUTILS_OUTPUT_TTY")) match {
+      case Some("1") => true;
+      case None => false;
     }
   }
 
