@@ -362,7 +362,8 @@ our %command_options = (
         "input" => "csv",
         "code" => sub {
             my ($node, $args) = @_;
-            ["bash", ["\$XSVUTILS_HOME/src/run-rust.sh"], "fromcsv", @$args];
+            #["bash", ["\$XSVUTILS_HOME/src/run-rust.sh"], "fromcsv", @$args];
+            ["perl", ["\$XSVUTILS_HOME/src/from-csv.pl"], @$args];
         },
     },
     "to-csv" => {
