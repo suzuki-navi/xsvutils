@@ -331,6 +331,24 @@ our %command_options = (
             ["perl", ["\$XSVUTILS_HOME/src/chart-bar.pl"], @$args];
         },
     },
+    "chart-bar-image" => {
+        "output" => "image-png",
+        "code" => sub {
+            my ($node, $args) = @_;
+            ["bash", ["\$XSVUTILS_HOME/src/run-python.sh"],
+             ["\$XSVUTILS_HOME/src/chart-bar-image.py"],
+             "/dev/stdout", "png", @$args];
+        },
+    },
+    "chart-scatter-image" => {
+        "output" => "image-png",
+        "code" => sub {
+            my ($node, $args) = @_;
+            ["bash", ["\$XSVUTILS_HOME/src/run-python.sh"],
+             ["\$XSVUTILS_HOME/src/chart-scatter-image.py"],
+             "/dev/stdout", "png", @$args];
+        },
+    },
 
     # 入出力のコマンド
     "read-file" => {
