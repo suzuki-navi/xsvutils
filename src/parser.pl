@@ -559,13 +559,10 @@ sub connectStdout {
         return;
     }
     my $output_node2;
-    my $isTerminal = 1;
-    if (!$isOutputTty) {
-        # ターミナル以外への標準出力は出力を整形しない
-        $isTerminal = "";
-    } elsif (defined($graph->{"options"}->{"--o-no-header"})) {
-        # このオプションが指定されている場合は出力を整形しない
-        $isTerminal = "";
+    my $isTerminal = "";
+    if ($isOutputTty) {
+        # ターミナルへの標準出力は出力を整形する
+        $isTerminal = 1;
     }
     $output_node2 = createOutputNode(undef, $graph->{"options"}, $isTerminal);
     $output_node2->{"connections"}->{"input"} = [$output_node, "output"];
@@ -826,15 +823,33 @@ sub walkPhase2_modifyNode_writeFile {
             die "Cannot convert format from $format->[0] to csv.";
         }
     } else {
-        if ($format->[0] eq "csv") {
+        if ($format->[0] eq "tsv") {
+            # nothing
+        } elsif ($format->[0] eq "csv") {
             # CSV->TSV 変換ノードを挿入
             $nodes = insertCsvToTsvNode($nodes, $i, $connectionName);
             $i++;
+        } elsif ($format->[0] eq "json") {
+            # nothing
+        } elsif ($format->[0] eq "string") {
+            # nothing
+        } elsif ($format->[0] eq "textsimple") {
+            # nothing
+        } elsif ($format->[0] eq "text") {
+            # nothing
+        } elsif ($format->[0] eq "image-png") {
+            if (defined($node->{"options"}->{"--terminal"})) {
+                die "Cannot output image file to terminal";
+            }
+        } else {
+            die;
         }
     }
     if (defined($node->{"internal"}->{"--o-no-header"})) {
         my $fmt = $node->{"connections"}->{$connectionName}->[2]->[0];
         if ($fmt eq "tsv" || $fmt eq "csv") {
+            delete($node->{"options"}->{"--terminal"});
+
             # ヘッダ削除のノードを挿入
             $nodes = insertNoHeaderNode($nodes, $i, $connectionName, $fmt);
             $i++;
