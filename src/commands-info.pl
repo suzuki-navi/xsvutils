@@ -355,6 +355,13 @@ our %command_options = (
         "input" => "any",
         "output" => "deny",
     },
+    "to-esbulk" => {
+        "output" => "json",
+        "code" => sub {
+            my ($node, $args) = @_;
+            ["perl", ["\$XSVUTILS_HOME/src/to-esbulk.pl"], @$args];
+        },
+    },
 
     # フォーマット変換のサブコマンド
     "from-csv" => {
