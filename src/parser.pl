@@ -1275,10 +1275,20 @@ sub buildCommandParametersForBash {
 
     my $args = buildNodeCommandParametersForBash($node);
     if (defined($coi->{"code"})) {
+        # この時点で @$args は ("bash", "???.cmd.sh", ...) というようなリストが入っている
         $args = $coi->{"code"}->($node, [(@$args)[2..(@$args - 1)]]);
     }
 
+    my $env = {};
+    if (defined($coi->{"env"})) {
+        $env = $coi->{"env"}->($node);
+    }
+
     my @args2 = ();
+    foreach my $k (sort keys %$env) {
+        my $v = $env->{$k};
+        push(@args2, "$k=" . escape_for_bash($v));
+    }
     foreach my $a (@$args) {
         if ((ref $a) eq "ARRAY") {
             push(@args2, $a->[0]);
