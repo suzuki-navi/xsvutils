@@ -355,6 +355,60 @@ our %command_options = (
         "input" => "any",
         "output" => "deny",
     },
+    "from-psql" => {
+        "options" => {
+            "-h" => "HOST",
+            "-p" => "PORT",
+            "-U" => "USER",
+            "-P" => "PASSWORD",
+            "-d" => "DATABASE",
+            "-t" => "TABLE",
+            "-c" => "QUERY",
+        },
+        "input" => "deny",
+        "code" => sub {
+            my ($node, $args) = @_;
+            my $cmds = ["psql", "-X", "-A", "-F", ["\$'\\t'"], "--pset=footer=off"];
+            if (defined($node->{"options"}->{"-h"})) {
+                push(@$cmds, "-h", $node->{"options"}->{"-h"});
+            }
+            if (defined($node->{"options"}->{"-p"})) {
+                push(@$cmds, "-p", $node->{"options"}->{"-p"});
+            }
+            if (defined($node->{"options"}->{"-U"})) {
+                push(@$cmds, "-U", $node->{"options"}->{"-U"});
+            }
+            if (defined($node->{"options"}->{"-d"})) {
+                push(@$cmds, "-d", $node->{"options"}->{"-d"});
+            }
+            my $query;
+            if (defined($node->{"options"}->{"-c"})) {
+                $query = "(" . $node->{"options"}->{"-c"} . ")";
+            } elsif (defined($node->{"options"}->{"-t"})) {
+                $query = "\"" . $node->{"options"}->{"-t"} . "\""; # TODO エスケープ処理 https://www.postgresql.jp/document/11/html/sql-syntax-lexical.html
+            } else {
+                $query = "(SELECT " .
+                           "n.nspname as \"Schema\", " .
+                           "c.relname as \"Name\", " .
+                           "CASE c.relkind WHEN 'r' THEN 'table' WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' WHEN 'i' THEN 'index' WHEN 'S' THEN 'sequence' WHEN 's' THEN 'special' WHEN 'f' THEN 'foreign table' WHEN 'p' THEN 'table' WHEN 'I' THEN 'index' END as \"Type\", " .
+                           "pg_catalog.pg_get_userbyid(c.relowner) as \"Owner\" " .
+                         "FROM pg_catalog.pg_class c LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace " .
+                         "WHERE c.relkind IN ('r','p','v','m','S','f','') AND n.nspname <> 'pg_catalog' AND n.nspname <> 'information_schema' AND n.nspname !~ '^pg_toast' AND pg_catalog.pg_table_is_visible(c.oid) " .
+                         "ORDER BY 1,2)";
+            }
+            $query = "COPY $query TO STDOUT (delimiter '\t', FORMAT CSV, HEADER TRUE);";
+            push(@$cmds, "-c", $query);
+            $cmds;
+        },
+        "env" => sub {
+            my ($node) = @_;
+            my $env = {};
+            if (defined($node->{"options"}->{"-P"})) {
+                $env->{"PGPASSWORD"} = $node->{"options"}->{"-P"};
+            }
+            $env;
+        },
+    },
 
     # フォーマット変換のサブコマンド
     "from-csv" => {
