@@ -26,13 +26,15 @@ while (@ARGV) {
         $table = shift(@ARGV);
     } elsif ($a eq "--append") {
         $action = "append";
+    } elsif ($a eq "--overwrite") {
+        $action = "overwrite";
     } else {
         die "Unknown argument: $a";
     }
 }
 
 die "subcommand `to-postgresql` requires option -t" unless defined $table;
-die "subcommand `to-postgresql` requires option --append" unless defined $action;
+die "subcommand `to-postgresql` requires option --overwrite or --append" unless defined $action;
 
 my $in = *STDIN;
 
@@ -61,15 +63,21 @@ if ($head_buf =~ /\A([^\n]*)\n(.*)\z/s) {
     $body = '';
 }
 
+my $query = "";
+
 {
     my $line = $header;
     my @cols = split(/\t/, $line, -1);
 
     my $colsStr = "\"" . join("\", \"", @cols) . "\"";
-    my $query = "COPY \"$table\" ($colsStr) FROM STDIN (DELIMITER '\t', FORMAT CSV, HEADER FALSE);";
-    push(@args, "-c", $query);
+    $query = "COPY \"$table\" ($colsStr) FROM STDIN (DELIMITER '\t', FORMAT CSV, HEADER FALSE);";
 }
 
+if ($action eq "overwrite") {
+    $query = "TRUNCATE \"$table\"; " . $query;
+}
+
+push(@args, "-c", $query);
 unshift(@args, "psql", "-X");
 
 my $READER1;

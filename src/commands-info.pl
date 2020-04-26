@@ -380,6 +380,7 @@ our %command_options = (
             "-d" => "DATABASE",
             "-t" => "TABLE",
             "--append" => "",
+            "--overwrite" => "",
         },
         "output" => "string",
         "code" => sub {
