@@ -371,6 +371,22 @@ our %command_options = (
             ["perl", ["\$XSVUTILS_HOME/src/from-postgresql.pl"], @$args];
         },
     },
+    "to-postgresql" => {
+        "options" => {
+            "-h" => "HOST",
+            "-p" => "PORT",
+            "-U" => "USER",
+            "-P" => "PASSWORD",
+            "-d" => "DATABASE",
+            "-t" => "TABLE",
+            "--append" => "",
+        },
+        "output" => "string",
+        "code" => sub {
+            my ($node, $args) = @_;
+            ["perl", ["\$XSVUTILS_HOME/src/to-postgresql.pl"], @$args];
+        },
+    },
 
     # フォーマット変換のサブコマンド
     "from-csv" => {

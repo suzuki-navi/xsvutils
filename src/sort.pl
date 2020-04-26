@@ -2,7 +2,8 @@ use strict;
 use warnings;
 use utf8;
 
-# uniq.pl とプログラムの構造がよく似ている
+# 1行目を読み込んでから別プロセスをexecする点で
+# uniq.pl, to-postgresql.pl とプログラムの構造がよく似ている
 
 my @sort_keys = ();
 

@@ -2,7 +2,8 @@ use strict;
 use warnings;
 use utf8;
 
-# sort.pl とプログラムの構造がよく似ている
+# 1行目を読み込んでから別プロセスをexecする点で
+# sort.pl, to-postgresql.pl とプログラムの構造がよく似ている
 
 my $in = *STDIN;
 
