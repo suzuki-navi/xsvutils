@@ -683,6 +683,28 @@ sub executeFormatWrapper {
 
 ################################################################################
 
+sub walkPhase0 {
+    my ($graph) = @_;
+    my $nodes = $graph->{"nodes"};
+    for (my $i = 0; $i < @$nodes; $i++) {
+        my $node = $nodes->[$i];
+        my $command_name = $node->{"command_name"};
+        if ($command_name eq "cat") {
+            my $input = $node->{"connections"}->{"input"};
+            my $output = $node->{"connections"}->{"output"};
+            $input->[0]->{"connections"}->{$input->[1]}->[0] = $output->[0];
+            $input->[0]->{"connections"}->{$input->[1]}->[1] = $output->[1];
+            $output->[0]->{"connections"}->{$output->[1]}->[0] = $input->[0];
+            $output->[0]->{"connections"}->{$output->[1]}->[1] = $input->[1];
+            $nodes = [(@$nodes)[0..($i - 1)], (@$nodes)[($i + 1)..(@$nodes - 1)]];
+            $i--;
+        }
+    }
+    $graph->{"nodes"} = $nodes;
+}
+
+################################################################################
+
 # 各ノードの入力と出力が必要な箇所で接続されているかどうか
 # 各ノードの入力や出力のない箇所で接続されていないかどうか
 # を検査する
@@ -1439,6 +1461,7 @@ $ENV{"WORKING_DIR"} = $working_dir;
 connectStdin($graph, $isInputTty);
 connectStdout($graph, $isOutputTty);
 executeFormatWrapper($graph);
+walkPhase0($graph);
 walkPhase1($graph);
 walkPhase2($graph);
 walkPhase3($graph);
