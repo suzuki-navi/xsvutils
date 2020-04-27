@@ -686,6 +686,45 @@ sub executeFormatWrapper {
 
 ################################################################################
 
+# 各ノードの入力と出力が必要な箇所で接続されているかどうか
+# 各ノードの入力や出力のない箇所で接続されていないかどうか
+# を検査する
+sub walkPhase1 {
+    my ($graph) = @_;
+    my $nodes = $graph->{"nodes"};
+    for (my $i = 0; $i < @$nodes; $i++) {
+        my $node = $nodes->[$i];
+        my $command_name = $node->{"command_name"};
+        my $coi = $command_options{$command_name};
+        if ($coi->{"input"}->[0] eq "deny") {
+            if (defined($node->{"connections"}->{"input"})) {
+                die "`$command_name` subcommand must not have input.";
+            }
+        } else {
+            if (!defined($node->{"connections"}->{"input"})) {
+                die "`$command_name` subcommand must have input.";
+            }
+        }
+        my $output_format;
+        if ((ref $coi->{"output"}) eq "CODE") {
+            $output_format = [""];
+        } else {
+            $output_format = $coi->{"output"};
+        }
+        if ($output_format->[0] eq "deny") {
+            if (defined($node->{"connections"}->{"output"})) {
+                die "`$command_name` subcommand must not have output.";
+            }
+        } else {
+            if (!defined($node->{"connections"}->{"output"})) {
+                die "`$command_name` subcommand must have output.";
+            }
+        }
+    }
+}
+
+################################################################################
+
 sub insertCsvToTsvNode {
     my ($nodes, $index, $inputName) = @_;
     my $newNode = {
@@ -754,54 +793,97 @@ sub insertNoHeaderNode {
     return insertNode($nodes, $index, $newNode);
 }
 
-# 各ノード間の入出力フォーマットが一致しているかを検査する
-# 一致していなくて可能であれば変換処理のノードを挿入する
-sub walkPhase1 {
-    my ($graph) = @_;
-    walkPhase1a($graph);
-    walkPhase1b($graph);
-}
-
-# 各ノードの入力と出力が必要な箇所で接続されているかどうか
-# 各ノードの入力や出力のない箇所で接続されていないかどうか
-# を検査する
-sub walkPhase1a {
-    my ($graph) = @_;
-    my $nodes = $graph->{"nodes"};
-    for (my $i = 0; $i < @$nodes; $i++) {
-        my $node = $nodes->[$i];
-        my $command_name = $node->{"command_name"};
-        my $coi = $command_options{$command_name};
-        if ($coi->{"input"}->[0] eq "deny") {
-            if (defined($node->{"connections"}->{"input"})) {
-                die "`$command_name` subcommand must not have input.";
-            }
+sub walkPhase2_modifyNode_writeFile {
+    my ($nodes, $i, $node, $connectionName, $format) = @_;
+    if ($node->{"internal"}->{"format"} eq "tsv") {
+        if ($format->[0] eq "tsv") {
+            # nothing
+        } elsif ($format->[0] eq "csv") {
+            # CSV->TSV 変換ノードを挿入
+            $nodes = insertCsvToTsvNode($nodes, $i, $connectionName);
+            $i++;
+        } elsif ($format->[0] eq "json") {
+            # JSON->TSV 変換ノードを挿入
+            $nodes = insertJsonToTsvNode($nodes, $i, $connectionName);
+            $i++;
         } else {
-            if (!defined($node->{"connections"}->{"input"})) {
-                die "`$command_name` subcommand must have input.";
-            }
+            die "Cannot convert format from $format->[0] to tsv.";
         }
-        my $output_format;
-        if ((ref $coi->{"output"}) eq "CODE") {
-            $output_format = [""];
+    } elsif ($node->{"internal"}->{"format"} eq "csv") {
+        if ($format->[0] eq "tsv") {
+            # TSV->CSV 変換ノードを挿入
+            $nodes = insertTsvToCsvNode($nodes, $i, $connectionName);
+            $i++;
+        } elsif ($format->[0] eq "csv") {
+            # nothing
+        } elsif ($format->[0] eq "json") {
+            # JSON->CSV 変換ノードを挿入
+            $nodes = insertJsonToTsvNode($nodes, $i, $connectionName);
+            $i++;
+            $nodes = insertTsvToCsvNode($nodes, $i, $connectionName);
+            $i++;
         } else {
-            $output_format = $coi->{"output"};
+            die "Cannot convert format from $format->[0] to csv.";
         }
-        if ($output_format->[0] eq "deny") {
-            if (defined($node->{"connections"}->{"output"})) {
-                die "`$command_name` subcommand must not have output.";
-            }
-        } else {
-            if (!defined($node->{"connections"}->{"output"})) {
-                die "`$command_name` subcommand must have output.";
-            }
+    } else {
+        if ($format->[0] eq "csv") {
+            # CSV->TSV 変換ノードを挿入
+            $nodes = insertCsvToTsvNode($nodes, $i, $connectionName);
+            $i++;
         }
     }
+    if (defined($node->{"internal"}->{"--o-no-header"})) {
+        my $fmt = $node->{"connections"}->{$connectionName}->[2]->[0];
+        if ($fmt eq "tsv" || $fmt eq "csv") {
+            # ヘッダ削除のノードを挿入
+            $nodes = insertNoHeaderNode($nodes, $i, $connectionName, $fmt);
+            $i++;
+        }
+    }
+    return ($nodes, $i);
+}
+
+sub walkPhase2_modifyNode_other {
+    my ($nodes, $i, $node, $connectionName, $format) = @_;
+    my $command_name = $node->{"command_name"};
+    my $coi = $command_options{$command_name};
+    if ($coi->{"input"}->[0] eq "tsv") {
+        if ($format->[0] eq "tsv") {
+            # nothing
+        } elsif ($format->[0] eq "csv") {
+            # CSV->TSV 変換ノードを挿入
+            $nodes = insertCsvToTsvNode($nodes, $i, "input");
+            $i++;
+        } elsif ($format->[0] eq "json") {
+            # JSON->TSV 変換ノードを挿入
+            $nodes = insertJsonToTsvNode($nodes, $i, "input");
+            $i++;
+        } elsif ($format->[0] ne "tsv") {
+            die "`$command_name` subcommand input must be tsv.";
+        }
+    } elsif ($coi->{"input"}->[0] eq "csv") {
+        if ($format->[0] ne "csv") {
+            die "`$command_name` subcommand input must be csv.";
+        }
+    } elsif ($coi->{"input"}->[0] eq "json") {
+        if ($format->[0] ne "json") {
+            die "`$command_name` subcommand input must be json.";
+        }
+    } elsif ($coi->{"input"}->[0] eq "text") {
+        if ($format->[0] !~ /\A(tsv|csv|json|text|textsimple|string)\z/) {
+            die "`$command_name` subcommand input must be text.";
+        }
+    } elsif ($coi->{"input"}->[0] eq "any") {
+        # nothing
+    } else {
+        die;
+    }
+    return ($nodes, $i);
 }
 
 # 各ノード間の入出力フォーマットがあっているかどうかを検査する
 # 一致していなくて可能であれば変換処理のノードを挿入する
-sub walkPhase1b {
+sub walkPhase2 {
     my ($graph) = @_;
     my $nodes = $graph->{"nodes"};
     for (my $i = 0; $i < @$nodes; $i++) {
@@ -816,93 +898,14 @@ sub walkPhase1b {
             if ($otherIdx < $i) {
                 my $format = $nodes->[$otherIdx]->{"connections"}->{$other->[1]}->[2];
                 $node->{"connections"}->{$key}->[2] = $format;
-
                 if ($key eq "input") {
                     if ($command_name eq "write-file") {
                         # SPECIAL IMPL FOR write-file
-                        if ($node->{"internal"}->{"format"} eq "tsv") {
-                            if ($format->[0] eq "tsv") {
-                                # nothing
-                            } elsif ($format->[0] eq "csv") {
-                                # CSV->TSV 変換ノードを挿入
-                                $nodes = insertCsvToTsvNode($nodes, $i, "input");
-                                $i++;
-                                $graph->{"nodes"} = $nodes;
-                            } elsif ($format->[0] eq "json") {
-                                # JSON->TSV 変換ノードを挿入
-                                $nodes = insertJsonToTsvNode($nodes, $i, "input");
-                                $i++;
-                                $graph->{"nodes"} = $nodes;
-                            } else {
-                                die "Cannot convert format from $format->[0] to tsv.";
-                            }
-                        } elsif ($node->{"internal"}->{"format"} eq "csv") {
-                            if ($format->[0] eq "tsv") {
-                                # TSV->CSV 変換ノードを挿入
-                                $nodes = insertTsvToCsvNode($nodes, $i, "input");
-                                $i++;
-                                $graph->{"nodes"} = $nodes;
-                            } elsif ($format->[0] eq "csv") {
-                                # nothing
-                            } elsif ($format->[0] eq "json") {
-                                # JSON->CSV 変換ノードを挿入
-                                $nodes = insertJsonToTsvNode($nodes, $i, "input");
-                                $i++;
-                                $nodes = insertTsvToCsvNode($nodes, $i, "input");
-                                $i++;
-                                $graph->{"nodes"} = $nodes;
-                            } else {
-                                die "Cannot convert format from $format->[0] to csv.";
-                            }
-                        } else {
-                            if ($format->[0] eq "csv") {
-                                # CSV->TSV 変換ノードを挿入
-                                $nodes = insertCsvToTsvNode($nodes, $i, "input");
-                                $i++;
-                                $graph->{"nodes"} = $nodes;
-                            }
-                        }
-                        if (defined($node->{"internal"}->{"--o-no-header"})) {
-                            my $fmt = $node->{"connections"}->{"input"}->[2]->[0];
-                            if ($fmt eq "tsv" || $fmt eq "csv") {
-                                # ヘッダ削除のノードを挿入
-                                $nodes = insertNoHeaderNode($nodes, $i, "input", $fmt);
-                                $i++;
-                                $graph->{"nodes"} = $nodes;
-                            }
-                        }
-                    } elsif ($coi->{"input"}->[0] eq "tsv") {
-                        if ($format->[0] eq "tsv") {
-                            # nothing
-                        } elsif ($format->[0] eq "csv") {
-                            # CSV->TSV 変換ノードを挿入
-                            $nodes = insertCsvToTsvNode($nodes, $i, "input");
-                            $i++;
-                            $graph->{"nodes"} = $nodes;
-                        } elsif ($format->[0] eq "json") {
-                            # JSON->TSV 変換ノードを挿入
-                            $nodes = insertJsonToTsvNode($nodes, $i, "input");
-                            $i++;
-                            $graph->{"nodes"} = $nodes;
-                        } elsif ($format->[0] ne "tsv") {
-                            die "`$command_name` subcommand input must be tsv.";
-                        }
-                    } elsif ($coi->{"input"}->[0] eq "csv") {
-                        if ($format->[0] ne "csv") {
-                            die "`$command_name` subcommand input must be csv.";
-                        }
-                    } elsif ($coi->{"input"}->[0] eq "json") {
-                        if ($format->[0] ne "json") {
-                            die "`$command_name` subcommand input must be json.";
-                        }
-                    } elsif ($coi->{"input"}->[0] eq "text") {
-                        if ($format->[0] !~ /\A(tsv|csv|json|text|textsimple|string)\z/) {
-                            die "`$command_name` subcommand input must be text.";
-                        }
-                    } elsif ($coi->{"input"}->[0] eq "any") {
-                        # nothing
+                        ($nodes, $i) = walkPhase2_modifyNode_writeFile($nodes, $i, $node, $key, $format);
+                        $graph->{"nodes"} = $nodes;
                     } else {
-                        die;
+                        ($nodes, $i) = walkPhase2_modifyNode_other($nodes, $i, $node, $key, $format);
+                        $graph->{"nodes"} = $nodes;
                     }
                 } else {
                     # TODO
@@ -935,7 +938,7 @@ sub walkPhase1b {
 ################################################################################
 
 # ノード単位でパラメータを見て書き換え
-sub walkPhase2 {
+sub walkPhase3 {
     my ($graph) = @_;
     my $nodes = $graph->{"nodes"};
     for (my $i = 0; $i < @$nodes; $i++) {
@@ -1083,7 +1086,7 @@ sub unifyRange {
 }
 
 # 各ノード間単の関係を見て書き換え
-sub walkPhase3 {
+sub walkPhase4 {
     my ($graph) = @_;
     my $nodes = $graph->{"nodes"};
     for (my $i = 0; $i < @$nodes; $i++) {
@@ -1424,6 +1427,7 @@ executeFormatWrapper($graph);
 walkPhase1($graph);
 walkPhase2($graph);
 walkPhase3($graph);
+walkPhase4($graph);
 
 ################################################################################
 
