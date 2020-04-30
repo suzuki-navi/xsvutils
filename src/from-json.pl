@@ -33,6 +33,7 @@ sub printRecord {
         } elsif ((ref $v) eq "HASH" || (ref $v) eq "ARRAY") {
             $v = $json->encode($v);
         }
+        $v =~ s/[\x00-\x1F]/ /g;
         push(@cols, $v);
     }
     print encode_utf8(join("\t", @cols)) . "\n";
